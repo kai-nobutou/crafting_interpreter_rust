@@ -1,0 +1,18 @@
+// これは Lox のサンプルスクリプトです。
+
+// 変数の宣言
+var greeting = "Hello, Lox!";
+
+// 変数の使用と出力
+print greeting;
+
+// 数値演算
+var result = 1 + 2 * 3;
+print result;
+
+// 条件付き出力
+if (result > 6) {
+    print "Result is greater than 6.";
+} else {
+    print "Result is 6 or less.";
+}

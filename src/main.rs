@@ -89,9 +89,12 @@ fn run_prompt(reporter: &mut ErrorReporter) -> io::Result<()> {
 }
 
 fn run(source: &str, reporter: &mut ErrorReporter) {
-    if source.contains("error") {
-        reporter.error(1, "Found 'error' in input.");
-    } else {
-        println!("Running: {}", source);
+    use crate::lox::scanner::Scanner;
+
+    let scanner = Scanner::new(source);
+    let tokens = scanner.scan_tokens();
+
+    for token in tokens {
+        println!("{:?}", token);
     }
 }
