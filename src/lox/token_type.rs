@@ -1,5 +1,6 @@
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TokenType {
+    // Single-character tokens
     LeftParen,
     RightParen,
     LeftBrace,
@@ -12,6 +13,7 @@ pub enum TokenType {
     Slash,
     Star,
 
+    // One or two character tokens
     Bang,
     BangEqual,
     Equal,
@@ -21,10 +23,12 @@ pub enum TokenType {
     Less,
     LessEqual,
 
+    // Literals
     Identifier,
     StringLit,
     Number,
 
+    // Keywords
     And,
     Class,
     Else,
@@ -45,10 +49,23 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum LiteralValue {
-    Number(f64),
     String(String),
+    Number(f64),
     Boolean(bool),
     Nil,
+}
+
+use std::fmt;
+
+impl fmt::Display for LiteralValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LiteralValue::Number(n) => write!(f, "{}", n),
+            LiteralValue::String(s) => write!(f, "{}", s),
+            LiteralValue::Boolean(b) => write!(f, "{}", b),
+            LiteralValue::Nil => write!(f, "nil"),
+        }
+    }
 }

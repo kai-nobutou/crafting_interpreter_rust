@@ -1,7 +1,6 @@
-use crate::lox::token_type::LiteralValue;
-use crate::lox::token_type::TokenType;
+use crate::lox::token_type::{TokenType, LiteralValue};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
@@ -9,13 +8,9 @@ pub struct Token {
     pub line: usize,
 }
 
+
 impl Token {
-    pub fn new(
-        token_type: TokenType,
-        lexeme: String,
-        literal: Option<LiteralValue>,
-        line: usize,
-    ) -> Self {
+    pub fn new(token_type: TokenType, lexeme: String, literal: Option<LiteralValue>, line: usize) -> Self {
         Token {
             token_type,
             lexeme,

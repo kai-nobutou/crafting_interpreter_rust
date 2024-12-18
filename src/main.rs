@@ -1,100 +1,52 @@
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, Write};
-use std::process;
 
 mod lox;
 
-struct ErrorReporter {
-    had_error: bool,
-}
-
-impl ErrorReporter {
-    fn new() -> Self {
-        ErrorReporter { had_error: false }
-    }
-
-    fn error(&mut self, line: usize, message: &str) {
-        eprintln!("[line {}] Error: {}", line, message);
-        self.had_error = true;
-    }
-
-    fn reset(&mut self) {
-        self.had_error = false;
-    }
-
-    fn had_error(&self) -> bool {
-        self.had_error
-    }
-}
-
-fn main() -> io::Result<()> {
-    let mut reporter = ErrorReporter::new();
+fn main() {
     let args: Vec<String> = env::args().collect();
-
-    match args.len() {
-        1 => {
-            run_prompt(&mut reporter)?;
-        }
-        2 => {
-            run_file(&args[1], &mut reporter)?;
-        }
-        _ => {
-            eprintln!("Usage: rlox [script]");
-            process::exit(64);
-        }
+    if args.len() > 2 {
+        eprintln!("Usage: rlox [script]");
+        std::process::exit(64);
+    } else if args.len() == 2 {
+        run_file(&args[1]);
+    } else {
+        run_prompt();
     }
-
-    if reporter.had_error() {
-        process::exit(65);
-    }
-
-    Ok(())
 }
 
-fn run_file(path: &str, reporter: &mut ErrorReporter) -> io::Result<()> {
-    let source = fs::read_to_string(path)?;
-    run(&source, reporter);
-    if reporter.had_error() {
-        process::exit(65);
-    }
-    Ok(())
+fn run_file(path: &str) {
+    let source = fs::read_to_string(path).expect("Failed to read the file");
+    run(&source);
 }
 
-fn run_prompt(reporter: &mut ErrorReporter) -> io::Result<()> {
+fn run_prompt() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
 
     loop {
-        write!(stdout, "> ")?;
-        stdout.flush()?;
+        write!(stdout, "> ").unwrap();
+        stdout.flush().unwrap();
 
         let mut line = String::new();
-        let bytes_read = stdin.lock().read_line(&mut line)?;
+        let bytes_read = stdin.lock().read_line(&mut line).unwrap();
 
         if bytes_read == 0 {
             break;
         }
 
-        let line = line.trim_end();
-        if line.is_empty() {
-            continue;
-        }
-
-        run(line, reporter);
-        reporter.reset();
+        run(&line);
     }
-
-    Ok(())
 }
 
-fn run(source: &str, reporter: &mut ErrorReporter) {
-    use crate::lox::scanner::Scanner;
-
-    let scanner = Scanner::new(source);
+fn run(source: &str) {
+    let mut scanner = lox::scanner::Scanner::new(source);
     let tokens = scanner.scan_tokens();
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    let mut parser = lox::parser::Parser::new(tokens);
+    let statements = parser.parse();
+
+    let mut evaluator = lox::evaluator::Evaluator::new();
+    evaluator.evaluate_statements(statements);
 }

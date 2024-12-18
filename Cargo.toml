@@ -3,6 +3,14 @@ name = "crafting_interpreter"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "rlox" 
+path = "src/main.rs"
+
+[[bin]]
+name = "generate_ast"
+path = "src/tool/ast_generator_main.rs"
+
 [dependencies]
 
 [lib]

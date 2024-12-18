@@ -1,6 +1,5 @@
 use crate::lox::token::Token;
-use crate::lox::token_type::LiteralValue;
-use crate::lox::token_type::TokenType;
+use crate::lox::token_type::{LiteralValue, TokenType};
 
 pub struct Scanner {
     source: String,
@@ -21,16 +20,19 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
         }
 
-        self.tokens
-            .push(Token::new(TokenType::Eof, "".to_string(), None, self.line));
-
-        self.tokens
+        self.tokens.push(Token::new(
+            TokenType::Eof,
+            "".to_string(),
+            None,
+            self.line,
+        ));
+        self.tokens.clone()
     }
 
     fn is_at_end(&self) -> bool {
@@ -50,82 +52,88 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
-
-            '!' | '=' | '<' | '>' => self.handle_two_char_token(c),
-            '/' => self.handle_slash(),
-
-            ' ' | '\r' | '\t' => {}
-            '\n' => self.line += 1,
-
-            '"' => self.string(),
-
-            _ => self.handle_default(c),
-        }
-    }
-
-    fn handle_two_char_token(&mut self, c: char) {
-        let token_type = match c {
             '!' => {
-                if self.match_char('=') {
+                let token_type = if self.match_char('=') {
                     TokenType::BangEqual
                 } else {
                     TokenType::Bang
-                }
+                };
+                self.add_token(token_type);
             }
             '=' => {
-                if self.match_char('=') {
+                let token_type = if self.match_char('=') {
                     TokenType::EqualEqual
                 } else {
                     TokenType::Equal
-                }
+                };
+                self.add_token(token_type);
             }
             '<' => {
-                if self.match_char('=') {
+                let token_type = if self.match_char('=') {
                     TokenType::LessEqual
                 } else {
                     TokenType::Less
-                }
+                };
+                self.add_token(token_type);
             }
             '>' => {
-                if self.match_char('=') {
+                let token_type = if self.match_char('=') {
                     TokenType::GreaterEqual
                 } else {
                     TokenType::Greater
+                };
+                self.add_token(token_type);
+            }
+            '/' => {
+                if self.match_char('/') {
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                } else {
+                    self.add_token(TokenType::Slash);
                 }
             }
-            _ => unreachable!(),
-        };
-        self.add_token(token_type);
-    }
-
-    fn handle_slash(&mut self) {
-        if self.match_char('/') {
-            while self.peek() != '\n' && !self.is_at_end() {
-                self.advance();
+            ' ' | '\r' | '\t' => {}
+            '\n' => self.line += 1,
+            '"' => self.string(),
+            _ => {
+                if c.is_ascii_digit() {
+                    self.number();
+                } else if c.is_ascii_alphabetic() || c == '_' {
+                    self.identifier();
+                } else {
+                    eprintln!("Unexpected character: {}", c);
+                }
             }
-        } else {
-            self.add_token(TokenType::Slash);
         }
     }
 
-    fn handle_default(&mut self, c: char) {
-        if c.is_ascii_digit() {
-            self.number();
-        } else if c.is_ascii_alphabetic() || c == '_' {
-            self.identifier();
-        } else {
-            eprintln!("Unexpected character at line {}: {}", self.line, c);
-        }
+    fn advance(&mut self) -> char {
+        let c = self.source.chars().nth(self.current).unwrap_or('\0');
+        self.current += 1;
+        c
     }
 
-    fn identifier(&mut self) {
-        while self.peek().is_ascii_alphanumeric() || self.peek() == '_' {
-            self.advance();
+    fn match_char(&mut self, expected: char) -> bool {
+        if self.is_at_end() {
+            return false;
         }
+        if self.source.chars().nth(self.current).unwrap_or('\0') != expected {
+            return false;
+        }
+        self.current += 1;
+        true
+    }
 
-        let text: String = self.substring(self.start, self.current);
-        let token_type = self.keyword_lookup(&text);
-        self.add_token(token_type);
+    fn add_token(&mut self, token_type: TokenType) {
+        let text = self.source[self.start..self.current].to_string();
+        self.tokens.push(Token::new(token_type, text, None, self.line));
+    }
+
+    fn add_token_with_literal(&mut self, token_type: TokenType, literal: LiteralValue) {
+        let text = self.source[self.start..self.current].to_string();
+        self.tokens
+            .push(Token::new(token_type, text, Some(literal), self.line));
     }
 
     fn string(&mut self) {
@@ -137,12 +145,12 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            eprintln!("Unterminated string at line {}", self.line);
+            eprintln!("Unterminated string.");
             return;
         }
 
-        self.advance(); // Consume the closing "
-        let value = self.substring(self.start + 1, self.current - 1);
+        self.advance(); // Consume the closing quote.
+        let value = self.source[self.start + 1..self.current - 1].to_string();
         self.add_token_with_literal(TokenType::StringLit, LiteralValue::String(value));
     }
 
@@ -159,59 +167,19 @@ impl Scanner {
             }
         }
 
-        let value: f64 = self
-            .substring(self.start, self.current)
+        let value: f64 = self.source[self.start..self.current]
             .parse()
-            .expect("Failed to parse number literal");
+            .expect("Failed to parse number.");
         self.add_token_with_literal(TokenType::Number, LiteralValue::Number(value));
     }
 
-    fn add_token(&mut self, token_type: TokenType) {
-        let text = self.substring(self.start, self.current);
-        self.tokens
-            .push(Token::new(token_type, text, None, self.line));
-    }
-
-    fn add_token_with_literal(&mut self, token_type: TokenType, literal: LiteralValue) {
-        let text = self.substring(self.start, self.current);
-        self.tokens
-            .push(Token::new(token_type, text, Some(literal), self.line));
-    }
-
-    fn substring(&self, start: usize, end: usize) -> String {
-        self.source.chars().skip(start).take(end - start).collect()
-    }
-
-    fn peek(&self) -> char {
-        self.source[self.current..].chars().next().unwrap_or('\0')
-    }
-
-    fn peek_next(&self) -> char {
-        self.source[self.current..].chars().nth(1).unwrap_or('\0')
-    }
-
-    fn advance(&mut self) -> char {
-        if let Some(c) = self.source[self.current..].chars().next() {
-            self.current += c.len_utf8();
-            c
-        } else {
-            '\0'
+    fn identifier(&mut self) {
+        while self.peek().is_ascii_alphanumeric() || self.peek() == '_' {
+            self.advance();
         }
-    }
 
-    fn match_char(&mut self, expected: char) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-        if self.peek() != expected {
-            return false;
-        }
-        self.current += 1;
-        true
-    }
-
-    fn keyword_lookup(&self, text: &str) -> TokenType {
-        match text {
+        let text = self.source[self.start..self.current].to_string();
+        let token_type = match text.as_str() {
             "and" => TokenType::And,
             "class" => TokenType::Class,
             "else" => TokenType::Else,
@@ -229,6 +197,15 @@ impl Scanner {
             "var" => TokenType::Var,
             "while" => TokenType::While,
             _ => TokenType::Identifier,
-        }
+        };
+        self.add_token(token_type);
+    }
+
+    fn peek(&self) -> char {
+        self.source.chars().nth(self.current).unwrap_or('\0')
+    }
+
+    fn peek_next(&self) -> char {
+        self.source.chars().nth(self.current + 1).unwrap_or('\0')
     }
 }
