@@ -107,19 +107,29 @@ impl Evaluator {
                     self.execute(*init_stmt)?;
                 }
 
-                while condition.as_ref().map_or(true, |cond| {
-                    match self.evaluate(cond) {
-                        Ok(value) => self.is_truthy(value),
-                        Err(err) => {
-                            eprintln!("Error evaluating condition: {}", err);
-                            false
+                loop {
+                    if let Some(cond_expr) = &condition {
+                        let cond_value = self.evaluate(cond_expr)?;
+                        if !self.is_truthy(cond_value) {
+                            break;
                         }
                     }
-                }) {
+
                     self.execute(*body.clone())?;
-                    if let Some(ref incr_expr) = increment {
+
+                    if let Some(incr_expr) = &increment {
                         self.evaluate(incr_expr)?;
                     }
+                }
+
+                Ok(())
+            }
+            Stmt::If { condition, then_branch, else_branch } => {
+                let cond_value = self.evaluate(&condition)?;
+                if self.is_truthy(cond_value) {
+                    self.execute(*then_branch.clone())?;
+                } else if let Some(else_stmt) = else_branch {
+                    self.execute(*else_stmt.clone())?;
                 }
                 Ok(())
             }
@@ -174,7 +184,13 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 _ => Err("Operands must be numbers.".to_string()),
             },
             TokenType::Percent => match (left_value, right_value) {
-                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Number(l % r)),
+                (LiteralValue::Number(l), LiteralValue::Number(r)) => {
+                    if r == 0.0 {
+                        Err("Modulo by zero.".to_string())
+                    } else {
+                        Ok(LiteralValue::Number(l % r))
+                    }
+                }
                 _ => Err("Operands must be numbers.".to_string()),
             },
             TokenType::Greater => match (left_value, right_value) {

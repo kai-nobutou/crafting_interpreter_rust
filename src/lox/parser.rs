@@ -49,6 +49,8 @@ impl Parser {
     fn statement(&mut self) -> Option<Stmt> {
         if self.match_token(&[TokenType::For]) {
             self.for_statement()
+        } else if self.match_token(&[TokenType::If]) {
+            self.if_statement()
         } else if self.match_token(&[TokenType::Print]) {
             self.print_statement()
         } else if self.match_token(&[TokenType::LeftBrace]) {
@@ -56,6 +58,28 @@ impl Parser {
         } else {
             self.expression_statement()
         }
+    }
+
+    fn if_statement(&mut self) -> Option<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        
+        let condition = self.expression()?;
+        
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+        
+        let then_branch = self.statement()?;
+        
+        let else_branch = if self.match_token(&[TokenType::Else]) {
+            Some(self.statement()?)
+        } else {
+            None
+        };
+        
+        Some(Stmt::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: else_branch.map(Box::new),
+        })
     }
 
     fn block(&mut self) -> Option<Stmt> {
@@ -265,31 +289,55 @@ impl Parser {
     }
 
     fn for_statement(&mut self) -> Option<Stmt> {
-        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
-        
+    
+        if self.consume(TokenType::LeftParen, "Expect '(' after 'for'.").is_none() {
+            return None;
+        }
+    
         let initializer = if self.match_token(&[TokenType::Semicolon]) {
             None
         } else if self.match_token(&[TokenType::Var]) {
-            Some(Box::new(self.var_declaration()?))
+            self.var_declaration().map(Box::new)
         } else {
-            Some(Box::new(self.expression_statement()?))
+            self.expression_statement().map(Box::new)
         };
     
+        // Condition
         let condition = if !self.check(TokenType::Semicolon) {
             self.expression()
         } else {
             None
         };
-        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+    
+        if self.consume(TokenType::Semicolon, "Expect ';' after loop condition.").is_none() {
+            return None;
+        }
     
         let increment = if !self.check(TokenType::RightParen) {
-            self.expression()
+            match self.expression() {
+                Some(expr) => {
+                    Some(expr)
+                }
+                None => {
+                    None
+                }
+            }
         } else {
             None
         };
-        self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
     
-        let body = self.statement()?;
+        if self.consume(TokenType::RightParen, "Expect ')' after for clauses.").is_none() {
+            return None;
+        }
+    
+        let body = match self.statement() {
+            Some(stmt) => {
+                stmt
+            },
+            None => {
+                return None;
+            }
+        };
     
         Some(Stmt::For {
             initializer,

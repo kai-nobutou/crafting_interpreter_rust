@@ -44,6 +44,11 @@ pub enum Stmt {
         increment: Option<Expr>,
         body: Box<Stmt>,
     }, 
+    If {
+        condition: Box<Expr>,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
 }
 
 impl Expr {
