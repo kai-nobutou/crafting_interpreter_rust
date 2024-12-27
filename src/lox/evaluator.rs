@@ -1,9 +1,8 @@
 use crate::lox::ast::{Expr, Stmt};
 use crate::lox::printer::Visitor;
-use crate::lox::token_type::LiteralValue;
-use std::collections::HashMap;
 use crate::lox::token::Token;
-use crate::lox::token_type::TokenType;
+use crate::lox::token_type::{LiteralValue, TokenType};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Environment {
@@ -98,11 +97,7 @@ impl Evaluator {
                 Ok(())
             }
             Stmt::While(condition, body) => {
-                loop {
-                    let value = self.evaluate(&condition)?;
-                    if !self.is_truthy(value) {
-                        break;
-                    }
+                while self.evaluate(&condition).map_or(false, |v| self.is_truthy(v)) {
                     self.execute(*body.clone())?;
                 }
                 Ok(())
@@ -178,34 +173,20 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 }
                 _ => Err("Operands must be numbers.".to_string()),
             },
-            TokenType::Greater => match (left_value, right_value) {
-                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Boolean(l > r)),
+            TokenType::Percent => match (left_value, right_value) {
+                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Number(l % r)),
                 _ => Err("Operands must be numbers.".to_string()),
             },
-            TokenType::GreaterEqual => match (left_value, right_value) {
-                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Boolean(l >= r)),
+            TokenType::Greater => match (left_value, right_value) {
+                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Boolean(l > r)),
                 _ => Err("Operands must be numbers.".to_string()),
             },
             TokenType::Less => match (left_value, right_value) {
                 (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Boolean(l < r)),
                 _ => Err("Operands must be numbers.".to_string()),
             },
-            TokenType::LessEqual => match (left_value, right_value) {
-                (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Boolean(l <= r)),
-                _ => Err("Operands must be numbers.".to_string()),
-            },
             TokenType::EqualEqual => Ok(LiteralValue::Boolean(left_value == right_value)),
             TokenType::BangEqual => Ok(LiteralValue::Boolean(left_value != right_value)),
-            TokenType::Percent => match (left_value, right_value) {
-                (LiteralValue::Number(l), LiteralValue::Number(r)) => {
-                    if r == 0.0 {
-                        Err("Modulo by zero.".to_string())
-                    } else {
-                        Ok(LiteralValue::Number(l % r))
-                    }
-                }
-                _ => Err("Operands must be numbers.".to_string()),
-            },
             _ => Err(format!("Unsupported operator: {:?}", operator.token_type)),
         }
     }
