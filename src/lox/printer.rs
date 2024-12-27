@@ -1,34 +1,30 @@
 use crate::lox::ast::{Expr, Stmt};
 use crate::lox::token::Token;
-use crate::lox::token_type::LiteralValue; // LiteralValueをインポート
+use crate::lox::token_type::LiteralValue;
 
 pub trait Visitor<R> {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> R;
-    fn visit_literal(&mut self, value: &LiteralValue) -> R; // ExprではなくLiteralValue
+    fn visit_literal(&mut self, value: &LiteralValue) -> R;
     fn visit_grouping(&mut self, expression: &Expr) -> R;
     fn visit_variable(&mut self, name: &Token) -> R;
     fn visit_unary(&mut self, operator: &Token, operand: &Expr) -> R;
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
 }
 
 pub struct AstPrinter;
 
 impl AstPrinter {
     pub fn print(&mut self, expr: &Expr) -> String {
-        expr.accept(self) // acceptでVisitorに委譲
+        expr.accept(self)
     }
 }
 
 impl Visitor<String> for AstPrinter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
-        format!(
-            "({} {} {})",
-            operator.lexeme,
-            self.print(left),
-            self.print(right)
-        )
+        format!("({} {} {})", operator.lexeme, self.print(left), self.print(right))
     }
 
-    fn visit_literal(&mut self, value: &LiteralValue) -> String { // LiteralValueを直接処理
+    fn visit_literal(&mut self, value: &LiteralValue) -> String {
         match value {
             LiteralValue::Number(n) => n.to_string(),
             LiteralValue::String(s) => s.clone(),
@@ -47,5 +43,9 @@ impl Visitor<String> for AstPrinter {
 
     fn visit_unary(&mut self, operator: &Token, operand: &Expr) -> String {
         format!("({} {})", operator.lexeme, self.print(operand))
+    }
+
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
+        format!("({} = {})", name.lexeme, self.print(value))
     }
 }

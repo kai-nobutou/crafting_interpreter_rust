@@ -9,7 +9,10 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Parser { tokens, current: 0 }
+        Parser { 
+            tokens, 
+            current: 0,
+        }
     }
 
     pub fn parse(&mut self) -> Vec<Stmt> {
@@ -44,11 +47,27 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Option<Stmt> {
-        if self.match_token(&[TokenType::Print]) {
+        if self.match_token(&[TokenType::For]) {
+            self.for_statement()
+        } else if self.match_token(&[TokenType::Print]) {
             self.print_statement()
+        } else if self.match_token(&[TokenType::LeftBrace]) {
+            self.block()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn block(&mut self) -> Option<Stmt> {
+        let mut statements = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            if let Some(stmt) = self.declaration() {
+                statements.push(stmt);
+            }
+        }
+    
+        self.consume(TokenType::RightBrace, "Expected '}' after block.")?;
+        Some(Stmt::Block(statements))
     }
 
     fn print_statement(&mut self) -> Option<Stmt> {
@@ -64,7 +83,26 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Option<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Option<Expr> {
+        let expr = self.equality()?;
+
+        if self.match_token(&[TokenType::Equal]) {
+            let value = self.assignment()?;
+
+            if let Expr::Variable { name } = expr {
+                return Some(Expr::Assign {
+                    name,
+                    value: Box::new(value),
+                });
+            }
+            eprintln!("Parsing error: Invalid assignment target.");
+            return None;
+        }
+
+        Some(expr)
     }
 
     fn equality(&mut self) -> Option<Expr> {
@@ -123,7 +161,7 @@ impl Parser {
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
 
-        while self.match_token(&[TokenType::Slash, TokenType::Star]) {
+        while self.match_token(&[TokenType::Slash, TokenType::Star, TokenType::Percent]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             expr = Some(Expr::Binary {
@@ -132,7 +170,6 @@ impl Parser {
                 right: Box::new(right),
             });
         }
-
         expr
     }
 
@@ -225,5 +262,40 @@ impl Parser {
 
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
+    }
+
+    fn for_statement(&mut self) -> Option<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+        
+        let initializer = if self.match_token(&[TokenType::Semicolon]) {
+            None
+        } else if self.match_token(&[TokenType::Var]) {
+            Some(Box::new(self.var_declaration()?))
+        } else {
+            Some(Box::new(self.expression_statement()?))
+        };
+    
+        let condition = if !self.check(TokenType::Semicolon) {
+            self.expression()
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+    
+        let increment = if !self.check(TokenType::RightParen) {
+            self.expression()
+        } else {
+            None
+        };
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
+    
+        let body = self.statement()?;
+    
+        Some(Stmt::For {
+            initializer,
+            condition,
+            increment,
+            body: Box::new(body),
+        })
     }
 }

@@ -52,6 +52,7 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
+            '%' => self.add_token(TokenType::Percent),
             '!' => {
                 let token_type = if self.match_char('=') {
                     TokenType::BangEqual

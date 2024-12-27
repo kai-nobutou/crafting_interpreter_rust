@@ -12,6 +12,7 @@ pub enum TokenType {
     Semicolon,
     Slash,
     Star,
+    Percent,
 
     // One or two character tokens
     Bang,
@@ -49,7 +50,7 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LiteralValue {
     String(String),
     Number(f64),
@@ -66,6 +67,15 @@ impl fmt::Display for LiteralValue {
             LiteralValue::String(s) => write!(f, "{}", s),
             LiteralValue::Boolean(b) => write!(f, "{}", b),
             LiteralValue::Nil => write!(f, "nil"),
+        }
+    }
+}
+
+impl LiteralValue {
+    pub fn as_number(&self) -> Option<f64> {
+        match self {
+            LiteralValue::Number(n) => Some(*n),
+            _ => None,
         }
     }
 }
