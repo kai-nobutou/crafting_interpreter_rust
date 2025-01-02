@@ -4,7 +4,7 @@ use crate::lox::token::Token;
 use crate::lox::token_type::{LiteralValue, TokenType};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     enclosing: Option<Box<Environment>>,
     values: HashMap<String, LiteralValue>,
@@ -98,7 +98,22 @@ impl Evaluator {
             }
             Stmt::While(condition, body) => {
                 while self.evaluate(&condition).map_or(false, |v| self.is_truthy(v)) {
+                    
+                    // Execute the loop body
                     self.execute(*body.clone())?;
+                    
+                    // インクリメント処理を追加
+                    if let Stmt::Block(statements) = *body.clone() {
+                        for stmt in statements {
+                            if let Stmt::Expression(expr) = stmt {
+                                if let Expr::Assign { name, value } = expr {
+                                    // 評価して値を更新
+                                    let new_value = self.evaluate(&value)?;
+                                    self.environment.assign(name.lexeme.clone(), new_value.clone());
+                                }
+                            }
+                        }
+                    }
                 }
                 Ok(())
             }

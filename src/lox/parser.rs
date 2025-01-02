@@ -49,6 +49,8 @@ impl Parser {
     fn statement(&mut self) -> Option<Stmt> {
         if self.match_token(&[TokenType::For]) {
             self.for_statement()
+        } else if self.match_token(&[TokenType::While]) {
+            self.while_statement()
         } else if self.match_token(&[TokenType::If]) {
             self.if_statement()
         } else if self.match_token(&[TokenType::Print]) {
@@ -58,6 +60,15 @@ impl Parser {
         } else {
             self.expression_statement()
         }
+    }
+
+
+    fn while_statement(&mut self) -> Option<Stmt> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after condition.")?;
+        let body = self.statement()?;
+        Some(Stmt::While(condition, Box::new(body)))
     }
 
     fn if_statement(&mut self) -> Option<Stmt> {
