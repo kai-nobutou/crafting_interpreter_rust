@@ -222,8 +222,7 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
         match operator.token_type {
             TokenType::Plus => match (left_value, right_value) {
                 (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Number(l + r)),
-                (LiteralValue::String(l), LiteralValue::String(r)) => Ok(LiteralValue::String(format!("{}{}", l, r))),
-                _ => Err("Operands must be two numbers or two strings.".to_string()),
+                _ => Err("Operands must be numbers.".to_string()),
             },
             TokenType::Minus => match (left_value, right_value) {
                 (LiteralValue::Number(l), LiteralValue::Number(r)) => Ok(LiteralValue::Number(l - r)),
@@ -323,24 +322,35 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 values: HashMap::new(),
             };
     
-            for (param, arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
+            // 修正: タプルを適切に分解し、パラメータとデフォルト値を扱う
+            for ((param_token, default_value), arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
                 let value = match arg {
                     Some(arg_expr) => self.evaluate(arg_expr)?,
-                    None => LiteralValue::Nil, // デフォルト値
+                    None => {
+                        if let Some(default_expr) = default_value {
+                            self.evaluate(default_expr)?
+                        } else {
+                            return Err(format!(
+                                "Missing argument for parameter '{}'.",
+                                param_token.lexeme
+                            ));
+                        }
+                    }
                 };
-                function_environment.define(param.lexeme.clone(), value);
+                function_environment.define(param_token.lexeme.clone(), value);
             }
     
-            let mut previous_environment = self.environment.clone();
-            self.environment = function_environment;
+            let previous_environment = std::mem::replace(&mut self.environment, function_environment);
     
             let result = match self.execute_block(body) {
                 Ok(value) => value,
                 Err(err) if err.starts_with("Return: ") => {
-                    let return_value = err.trim_start_matches("Return: ").to_string();
-                    self.evaluate(&Expr::Literal {
-                        value: LiteralValue::String(return_value),
-                    })?
+                    let return_value = err.trim_start_matches("Return: ");
+                    if return_value == "nil" {
+                        LiteralValue::Nil
+                    } else {
+                        LiteralValue::Number(return_value.parse().unwrap_or(0.0))
+                    }
                 }
                 Err(err) => return Err(err),
             };
