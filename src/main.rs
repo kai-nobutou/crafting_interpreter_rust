@@ -42,8 +42,14 @@ fn run_prompt() {
 
 fn run(source: &str) {
     let mut scanner = lox::scanner::Scanner::new(source);
-    let tokens = scanner.scan_tokens();
-    
+    let tokens_and_defaults = scanner.scan_tokens();
+
+    // トークン部分のみを抽出してParserに渡す
+    let tokens: Vec<lox::token::Token> = tokens_and_defaults
+        .into_iter()
+        .map(|(token, _)| token)
+        .collect();
+
     let mut parser = lox::parser::Parser::new(tokens);
     let statements = parser.parse();
 

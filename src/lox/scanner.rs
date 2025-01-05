@@ -1,5 +1,6 @@
 use crate::lox::token::Token;
 use crate::lox::token_type::{LiteralValue, TokenType};
+use crate::lox::ast::Expr;
 
 pub struct Scanner {
     source: String,
@@ -20,19 +21,24 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<(Token, Option<Expr>)>  {
+    pub fn scan_tokens(&mut self) -> Vec<(Token, Option<Expr>)> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
         }
-
+    
         self.tokens.push(Token::new(
             TokenType::Eof,
             "".to_string(),
             None,
             self.line,
         ));
-        self.tokens.clone()
+    
+        self.tokens
+            .clone()
+            .into_iter()
+            .map(|token| (token, None)) // Option<Expr>をNoneとして扱う
+            .collect()
     }
 
     fn is_at_end(&self) -> bool {

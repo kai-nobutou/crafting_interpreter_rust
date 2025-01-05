@@ -33,11 +33,14 @@ impl Environment {
         }
     }
 
-    pub fn assign(&mut self, name: String, value: LiteralValue) {
+    pub fn assign(&mut self, name: String, value: LiteralValue) -> Result<(), String> {
         if self.values.contains_key(&name) {
             self.values.insert(name, value);
+            Ok(())
         } else if let Some(enclosing) = &mut self.enclosing {
-            enclosing.assign(name, value);
+            enclosing.assign(name, value)
+        } else {
+            Err(format!("Undefined variable '{}'.", name))
         }
     }
 }
@@ -320,18 +323,12 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 values: HashMap::new(),
             };
     
-            for ((param_name, default_value), arg) in params.iter().zip(arguments.iter().cloned().map(Some).chain(std::iter::repeat(None))) {
+            for (param, arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
                 let value = match arg {
-                    Some(arg_expr) => self.evaluate(&arg_expr)?,
-                    None => {
-                        if let Some(default_expr) = default_value {
-                            self.evaluate(default_expr)?
-                        } else {
-                            return Err(format!("Missing argument for parameter '{}'.", param_name.lexeme));
-                        }
-                    }
+                    Some(arg_expr) => self.evaluate(arg_expr)?,
+                    None => LiteralValue::Nil, // デフォルト値
                 };
-                function_environment.define(param_name.lexeme.clone(), value);
+                function_environment.define(param.lexeme.clone(), value);
             }
     
             let mut previous_environment = self.environment.clone();
