@@ -4,7 +4,8 @@ use crate::lox::token::Token;
 use crate::lox::token_type::{LiteralValue, TokenType};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     enclosing: Option<Box<Environment>>,
     values: HashMap<String, LiteralValue>,
@@ -52,6 +53,27 @@ impl Evaluator {
             environment: Environment::new(),
             had_error: false,
         }
+    }
+    
+    fn execute_block(&mut self, statements: Vec<Stmt>) -> Result<LiteralValue, String> {
+        for stmt in statements {
+            if let Err(err) = self.execute(stmt) {
+                if err.starts_with("Return: ") {
+                    let value_str = err.trim_start_matches("Return: ");
+                    let result = if value_str == "nil" {
+                        LiteralValue::Nil
+                    } else if let Ok(number) = value_str.parse::<f64>() {
+                        LiteralValue::Number(number)
+                    } else {
+                        LiteralValue::String(value_str.to_string())
+                    };
+                    return Ok(result);
+                } else {
+                    return Err(err);
+                }
+            }
+        }
+        Ok(LiteralValue::Nil)
     }
 
     pub fn evaluate_statements(&mut self, statements: Vec<Stmt>) {
@@ -148,6 +170,25 @@ impl Evaluator {
                 }
                 Ok(())
             }
+            Stmt::Function { name, params, body } => {
+                let function = LiteralValue::Function {
+                    name: name.lexeme.clone(),
+                    params,
+                    body,
+                    closure: self.environment.clone(),
+                };
+                self.environment.define(name.lexeme.clone(), function);
+                Ok(())
+            }
+            Stmt::Return { keyword: _, value } => {
+                let result = if let Some(expr) = value {
+                    self.evaluate(&expr)?
+                } else {
+                    LiteralValue::Nil
+                };
+            
+                Err(format!("Return: {:?}", result))
+            }
         }
     }
 
@@ -163,6 +204,7 @@ impl Evaluator {
         }
     }
 }
+
 
 impl Visitor<Result<LiteralValue, String>> for Evaluator {
     fn visit_binary(
@@ -255,5 +297,62 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
         let value = self.evaluate(value)?;
         self.environment.assign(name.lexeme.clone(), value.clone());
         Ok(value)
+    }
+
+    fn visit_call(
+        &mut self,
+        callee: &Expr,
+        arguments: &[Expr],
+    ) -> Result<LiteralValue, String> {
+        let callee_value = self.evaluate(callee)?;
+    
+        if let LiteralValue::Function { params, body, closure, .. } = callee_value {
+            if arguments.len() > params.len() {
+                return Err(format!(
+                    "Expected at most {} arguments but got {}.",
+                    params.len(),
+                    arguments.len()
+                ));
+            }
+    
+            let mut function_environment = Environment {
+                enclosing: Some(Box::new(closure)),
+                values: HashMap::new(),
+            };
+    
+            for ((param_name, default_value), arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
+                let value = match arg {
+                    Some(arg_expr) => self.evaluate(arg_expr)?,
+                    None => {
+                        if let Some(default_expr) = default_value {
+                            self.evaluate(default_expr)?
+                        } else {
+                            return Err(format!("Missing argument for parameter '{}'.", param_name.lexeme));
+                        }
+                    }
+                };
+                function_environment.define(param_name.lexeme.clone(), value);
+            }
+    
+            let mut previous_environment = self.environment.clone();
+            self.environment = function_environment;
+    
+            let result = match self.execute_block(body) {
+                Ok(value) => value,
+                Err(err) if err.starts_with("Return: ") => {
+                    let return_value = err.trim_start_matches("Return: ").to_string();
+                    self.evaluate(&Expr::Literal {
+                        value: LiteralValue::String(return_value),
+                    })?
+                }
+                Err(err) => return Err(err),
+            };
+    
+            self.environment = previous_environment;
+    
+            Ok(result)
+        } else {
+            Err("Can only call functions.".to_string())
+        }
     }
 }

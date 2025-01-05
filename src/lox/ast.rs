@@ -2,7 +2,7 @@ use crate::lox::token::Token;
 use crate::lox::token_type::LiteralValue;
 use crate::lox::printer::Visitor;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -26,9 +26,13 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+    },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -49,6 +53,15 @@ pub enum Stmt {
         then_branch: Box<Stmt>,
         else_branch: Option<Box<Stmt>>,
     },
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+    },
+    Return {
+        keyword: Token,
+        value: Option<Expr>,
+    },
 }
 
 impl Expr {
@@ -60,6 +73,7 @@ impl Expr {
             Expr::Variable { name } => visitor.visit_variable(name),
             Expr::Unary { operator, operand } => visitor.visit_unary(operator, operand),
             Expr::Assign { name, value } => visitor.visit_assign(name, value),
+            Expr::Call { callee, arguments } => visitor.visit_call(callee, arguments),
         }
     }
 }

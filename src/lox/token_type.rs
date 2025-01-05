@@ -1,3 +1,7 @@
+use crate::lox::token::Token;
+use crate::lox::ast::Stmt;
+use crate::lox::evaluator::Environment;
+
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum TokenType {
     // Single-character tokens
@@ -56,6 +60,12 @@ pub enum LiteralValue {
     Number(f64),
     Boolean(bool),
     Nil,
+    Function {
+        name: String,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+        closure: Environment,
+    },
 }
 
 use std::fmt;
@@ -67,6 +77,9 @@ impl fmt::Display for LiteralValue {
             LiteralValue::String(s) => write!(f, "{}", s),
             LiteralValue::Boolean(b) => write!(f, "{}", b),
             LiteralValue::Nil => write!(f, "nil"),
+            LiteralValue::Function { name, .. } => {
+                write!(f, "<fn {}>", name)
+            }
         }
     }
 }

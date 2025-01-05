@@ -20,7 +20,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Vec<(Token, Option<Expr>)>  {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();

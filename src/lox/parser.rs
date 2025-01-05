@@ -26,8 +26,10 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        if self.match_token(&[TokenType::Var]) {
-            self.var_declaration()
+        if self.match_token(&[TokenType::Fun]) {
+            self.function("function")
+        } else if self.match_token(&[TokenType::Var]) {
+          self.var_declaration()
         } else {
             self.statement()
         }
@@ -53,6 +55,8 @@ impl Parser {
             self.while_statement()
         } else if self.match_token(&[TokenType::If]) {
             self.if_statement()
+        } else if self.match_token(&[TokenType::Return]) {
+            self.return_statement()
         } else if self.match_token(&[TokenType::Print]) {
             self.print_statement()
         } else if self.match_token(&[TokenType::LeftBrace]) {
@@ -60,6 +64,18 @@ impl Parser {
         } else {
             self.expression_statement()
         }
+    }
+
+    fn return_statement(&mut self) -> Option<Stmt> {
+        let keyword = self.previous().clone();
+    
+        let value = if !self.check(TokenType::Semicolon) {
+            self.expression()
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expected ';' after return value.")?;
+        Some(Stmt::Return { keyword, value })
     }
 
 
@@ -95,9 +111,12 @@ impl Parser {
 
     fn block(&mut self) -> Option<Stmt> {
         let mut statements = Vec::new();
+    
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
                 statements.push(stmt);
+            } else {
+                return None;
             }
         }
     
@@ -133,7 +152,6 @@ impl Parser {
                     value: Box::new(value),
                 });
             }
-            eprintln!("Parsing error: Invalid assignment target.");
             return None;
         }
 
@@ -227,7 +245,7 @@ impl Parser {
                 return Some(Expr::Literal { value: literal.clone() });
             }
         }
-
+    
         if self.match_token(&[TokenType::StringLit]) {
             if let Some(literal) = &self.previous().literal {
                 if let LiteralValue::String(s) = literal {
@@ -237,13 +255,30 @@ impl Parser {
                 }
             }
         }
-
+    
         if self.match_token(&[TokenType::Identifier]) {
-            return Some(Expr::Variable {
-                name: self.previous().clone(),
-            });
+            let variable = self.previous().clone();
+    
+            if self.match_token(&[TokenType::LeftParen]) {
+                let mut arguments = Vec::new();
+                if !self.check(TokenType::RightParen) {
+                    loop {
+                        arguments.push(self.expression()?);
+                        if !self.match_token(&[TokenType::Comma]) {
+                            break;
+                        }
+                    }
+                }
+                self.consume(TokenType::RightParen, "Expect ')' after arguments.")?;
+                return Some(Expr::Call {
+                    callee: Box::new(Expr::Variable { name: variable }),
+                    arguments,
+                });
+            }
+    
+            return Some(Expr::Variable { name: variable });
         }
-
+    
         if self.match_token(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
@@ -251,7 +286,6 @@ impl Parser {
                 expression: Box::new(expr),
             });
         }
-
         None
     }
 
@@ -355,6 +389,41 @@ impl Parser {
             condition,
             increment,
             body: Box::new(body),
+        })
+    }
+    
+    fn function(&mut self, kind: &str) -> Option<Stmt> {
+        let name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?.clone();
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.", kind))?;
+    
+        let mut params: Vec<(Token, Option<Expr>)> = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                let param_name = self.consume(TokenType::Identifier, "Expect parameter name.")?;
+                let default_value = if self.match_token(&[TokenType::Equal]) {
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+                params.push((param_name, default_value));
+
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
+    
+        let body = match self.block()? {
+            Stmt::Block(statements) => statements,
+            _ => return None,
+        };
+    
+        Some(Stmt::Function {
+            name,
+            params,
+            body,
         })
     }
 }

@@ -9,6 +9,7 @@ pub trait Visitor<R> {
     fn visit_variable(&mut self, name: &Token) -> R;
     fn visit_unary(&mut self, operator: &Token, operand: &Expr) -> R;
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
+    fn visit_call(&mut self, callee: &Expr, arguments: &[Expr]) -> R;
 }
 
 pub struct AstPrinter;
@@ -30,6 +31,7 @@ impl Visitor<String> for AstPrinter {
             LiteralValue::String(s) => s.clone(),
             LiteralValue::Boolean(b) => b.to_string(),
             LiteralValue::Nil => "nil".to_string(),
+            LiteralValue::Function { name, .. } => format!("<fn {}>", name),
         }
     }
 
@@ -47,5 +49,15 @@ impl Visitor<String> for AstPrinter {
 
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
         format!("({} = {})", name.lexeme, self.print(value))
+    }
+
+    
+    fn visit_call(&mut self, callee: &Expr, arguments: &[Expr]) -> String {
+        let args = arguments
+            .iter()
+            .map(|arg| self.print(arg))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("(call {} {})", self.print(callee), args)
     }
 }
