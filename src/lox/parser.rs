@@ -401,7 +401,7 @@ impl Parser {
             loop {
                 let param_name = self.consume(TokenType::Identifier, "Expect parameter name.")?;
                 params.push(param_name.clone());
-
+        
                 if !self.match_token(&[TokenType::Comma]) {
                     break;
                 }
@@ -410,16 +410,16 @@ impl Parser {
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
     
-        // 関数本体を解析
         let body = match self.block()? {
             Stmt::Block(statements) => statements,
             _ => return None,
         };
     
-        // Stmt::Function を返す
+        let param_tokens: Vec<Token> = params.clone(); 
+    
         Some(Stmt::Function {
             name,
-            params,
+            params: param_tokens,
             body,
         })
     }

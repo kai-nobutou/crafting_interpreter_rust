@@ -309,9 +309,9 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
         let callee_value = self.evaluate(callee)?;
     
         if let LiteralValue::Function { params, body, closure, .. } = callee_value {
-            if arguments.len() > params.len() {
+            if arguments.len() != params.len() {
                 return Err(format!(
-                    "Expected at most {} arguments but got {}.",
+                    "Expected {} arguments but got {}.",
                     params.len(),
                     arguments.len()
                 ));
@@ -322,39 +322,27 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 values: HashMap::new(),
             };
     
-            // 修正: タプルを適切に分解し、パラメータとデフォルト値を扱う
-            for ((param_token, default_value), arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
-                let value = match arg {
-                    Some(arg_expr) => self.evaluate(arg_expr)?,
-                    None => {
-                        if let Some(default_expr) = default_value {
-                            self.evaluate(default_expr)?
-                        } else {
-                            return Err(format!(
-                                "Missing argument for parameter '{}'.",
-                                param_token.lexeme
-                            ));
-                        }
-                    }
-                };
-                function_environment.define(param_token.lexeme.clone(), value);
+            for (param, arg) in params.iter().zip(arguments.iter()) {
+                let value = self.evaluate(arg)?;
+                function_environment.define(param.lexeme.clone(), value);
             }
     
-            let previous_environment = std::mem::replace(&mut self.environment, function_environment);
+            // スコープの切り替え
+            let mut previous_environment = self.environment.clone();
+            self.environment = function_environment;
     
             let result = match self.execute_block(body) {
                 Ok(value) => value,
                 Err(err) if err.starts_with("Return: ") => {
-                    let return_value = err.trim_start_matches("Return: ");
-                    if return_value == "nil" {
-                        LiteralValue::Nil
-                    } else {
-                        LiteralValue::Number(return_value.parse().unwrap_or(0.0))
-                    }
+                    let return_value = err.trim_start_matches("Return: ").to_string();
+                    self.evaluate(&Expr::Literal {
+                        value: LiteralValue::String(return_value),
+                    })?
                 }
                 Err(err) => return Err(err),
             };
     
+            // スコープを元に戻す
             self.environment = previous_environment;
     
             Ok(result)
