@@ -399,14 +399,17 @@ impl Parser {
         let mut params: Vec<(Token, Option<Expr>)> = Vec::new();
         if !self.check(TokenType::RightParen) {
             loop {
+                // パラメータ名を取得
                 let param_name = self.consume(TokenType::Identifier, "Expect parameter name.")?;
+                // デフォルト値をチェック
                 let default_value = if self.match_token(&[TokenType::Equal]) {
                     Some(self.expression()?)
                 } else {
                     None
                 };
                 params.push((param_name, default_value));
-
+    
+                // 次のパラメータがあるかどうかを確認
                 if !self.match_token(&[TokenType::Comma]) {
                     break;
                 }
@@ -415,11 +418,13 @@ impl Parser {
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
     
+        // 関数本体を解析
         let body = match self.block()? {
             Stmt::Block(statements) => statements,
             _ => return None,
         };
     
+        // Stmt::Function を返す
         Some(Stmt::Function {
             name,
             params,

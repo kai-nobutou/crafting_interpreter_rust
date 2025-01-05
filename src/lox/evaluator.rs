@@ -320,9 +320,9 @@ impl Visitor<Result<LiteralValue, String>> for Evaluator {
                 values: HashMap::new(),
             };
     
-            for ((param_name, default_value), arg) in params.iter().zip(arguments.iter().map(Some).chain(std::iter::repeat(None))) {
+            for ((param_name, default_value), arg) in params.iter().zip(arguments.iter().cloned().map(Some).chain(std::iter::repeat(None))) {
                 let value = match arg {
-                    Some(arg_expr) => self.evaluate(arg_expr)?,
+                    Some(arg_expr) => self.evaluate(&arg_expr)?,
                     None => {
                         if let Some(default_expr) = default_value {
                             self.evaluate(default_expr)?

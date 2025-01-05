@@ -1,4 +1,4 @@
-use crate::lox::ast::{Expr, Stmt};
+use crate::lox::ast::Expr;
 use crate::lox::token::Token;
 use crate::lox::token_type::LiteralValue;
 
