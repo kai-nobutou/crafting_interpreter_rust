@@ -1,6 +1,6 @@
 use crate::lox::token::Token;
 use crate::lox::token_type::{LiteralValue, TokenType};
-use crate::lox::ast::Expr;
+
 
 pub struct Scanner {
     source: String,
@@ -21,12 +21,14 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<(Token, Option<Expr>)> {
+    
+    pub fn scan_tokens(&mut self) -> Vec<Token> {
+        
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_token();
+            self.scan_token(); // 各トークンをスキャン
         }
-    
+       
         self.tokens.push(Token::new(
             TokenType::Eof,
             "".to_string(),
@@ -34,11 +36,7 @@ impl Scanner {
             self.line,
         ));
     
-        self.tokens
-            .clone()
-            .into_iter()
-            .map(|token| (token, None)) // Option<Expr>をNoneとして扱う
-            .collect()
+        self.tokens.clone()
     }
 
     fn is_at_end(&self) -> bool {
@@ -93,7 +91,7 @@ impl Scanner {
             }
             '/' => {
                 if self.match_char('/') {
-                    while self.peek() != '\n' && !self.is_at_end() {
+                    while !self.is_at_end() && self.peek() != '\n' {
                         self.advance();
                     }
                 } else {
@@ -144,8 +142,8 @@ impl Scanner {
     }
 
     fn string(&mut self) {
-        while self.peek() != '"' && !self.is_at_end() {
-            if self.peek() == '\n' {
+        while !self.is_at_end() && self.peek() != '"' {
+            if !self.is_at_end() && self.peek() == '\n' {
                 self.line += 1;
             }
             self.advance();
@@ -162,14 +160,14 @@ impl Scanner {
     }
 
     fn number(&mut self) {
-        while self.peek().is_ascii_digit() {
+        while !self.is_at_end() && self.peek().is_ascii_digit() {
             self.advance();
         }
-
-        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
+        
+        if !self.is_at_end() && self.peek() == '.' && !self.is_at_end() && self.peek_next().is_ascii_digit() {
             self.advance();
-
-            while self.peek().is_ascii_digit() {
+        
+            while !self.is_at_end() && self.peek().is_ascii_digit() {
                 self.advance();
             }
         }
@@ -181,7 +179,7 @@ impl Scanner {
     }
 
     fn identifier(&mut self) {
-        while self.peek().is_ascii_alphanumeric() || self.peek() == '_' {
+        while !self.is_at_end() && (self.peek().is_ascii_alphanumeric() || self.peek() == '_') {
             self.advance();
         }
 
@@ -209,10 +207,18 @@ impl Scanner {
     }
 
     fn peek(&self) -> char {
-        self.source.chars().nth(self.current).unwrap_or('\0')
+        if self.is_at_end() {
+            '\0'
+        } else {
+            self.source.chars().nth(self.current).unwrap_or('\0')
+        }
     }
 
     fn peek_next(&self) -> char {
-        self.source.chars().nth(self.current + 1).unwrap_or('\0')
+        if self.current + 1 >= self.source.len() {
+            '\0'
+        } else {
+            self.source.chars().nth(self.current + 1).unwrap_or('\0')
+        }
     }
 }

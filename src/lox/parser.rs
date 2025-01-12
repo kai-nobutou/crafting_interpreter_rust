@@ -2,9 +2,13 @@ use crate::lox::ast::{Expr, Stmt};
 use crate::lox::token::{Token};
 use crate::lox::token_type::{TokenType, LiteralValue};
 
+
+const MAX_RECURSION_DEPTH: usize = 1000;
+
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    recursion_depth: usize,
 }
 
 impl Parser {
@@ -12,6 +16,7 @@ impl Parser {
         Parser { 
             tokens, 
             current: 0,
+            recursion_depth: 0,
         }
     }
 
@@ -20,6 +25,8 @@ impl Parser {
         while !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
                 statements.push(stmt);
+            } else {
+                break;
             }
         }
         statements
@@ -27,12 +34,12 @@ impl Parser {
 
     fn declaration(&mut self) -> Option<Stmt> {
         if self.match_token(&[TokenType::Fun]) {
-            self.function("function")
+            return self.function("function");
         } else if self.match_token(&[TokenType::Var]) {
-          self.var_declaration()
-        } else {
-            self.statement()
+            return self.var_declaration();
         }
+    
+        self.statement()
     }
 
     fn var_declaration(&mut self) -> Option<Stmt> {
@@ -110,17 +117,20 @@ impl Parser {
     }
 
     fn block(&mut self) -> Option<Stmt> {
+        println!("block: Entering block");
         let mut statements = Vec::new();
     
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
                 statements.push(stmt);
             } else {
+                println!("block: Error in declaration inside block");
                 return None;
             }
         }
     
         self.consume(TokenType::RightBrace, "Expected '}' after block.")?;
+        println!("block: Exiting block with statements: {:?}", statements);
         Some(Stmt::Block(statements))
     }
 
@@ -137,30 +147,37 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Option<Expr> {
-        self.assignment()
+        if self.recursion_depth > MAX_RECURSION_DEPTH {
+            eprintln!("Error: Maximum recursion depth exceeded.");
+            return None;
+        }
+        self.recursion_depth += 1;
+        let result = self.assignment();
+        self.recursion_depth -= 1;
+        result
     }
 
     fn assignment(&mut self) -> Option<Expr> {
-        let expr = self.equality()?;
-
-        if self.match_token(&[TokenType::Equal]) {
-            let value = self.assignment()?;
-
+        let mut expr = self.equality()?;
+    
+        while self.match_token(&[TokenType::Equal]) {
+            let value = self.equality()?; // 再帰をループに変更
             if let Expr::Variable { name } = expr {
-                return Some(Expr::Assign {
+                expr = Expr::Assign {
                     name,
                     value: Box::new(value),
-                });
+                };
+            } else {
+                return None; // 不正な代入の場合
             }
-            return None;
         }
-
+    
+        // println!("Exiting assignment with result: {:?}", expr);
         Some(expr)
     }
 
     fn equality(&mut self) -> Option<Expr> {
         let mut expr = self.comparison();
-
         while self.match_token(&[TokenType::BangEqual, TokenType::EqualEqual]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
@@ -176,7 +193,6 @@ impl Parser {
 
     fn comparison(&mut self) -> Option<Expr> {
         let mut expr = self.term();
-
         while self.match_token(&[
             TokenType::Greater,
             TokenType::GreaterEqual,
@@ -191,13 +207,11 @@ impl Parser {
                 right: Box::new(right),
             });
         }
-
         expr
     }
 
     fn term(&mut self) -> Option<Expr> {
         let mut expr = self.factor();
-
         while self.match_token(&[TokenType::Minus, TokenType::Plus]) {
             let operator = self.previous().clone();
             let right = self.factor()?;
@@ -213,7 +227,7 @@ impl Parser {
 
     fn factor(&mut self) -> Option<Expr> {
         let mut expr = self.unary();
-
+        
         while self.match_token(&[TokenType::Slash, TokenType::Star, TokenType::Percent]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
@@ -303,15 +317,16 @@ impl Parser {
         if self.check(token_type) {
             return Some(self.advance());
         }
-        eprintln!("Parsing error: {}", message);
+        eprintln!("Parsing error in consume: {}", message);
         None
     }
 
     fn check(&self, token_type: TokenType) -> bool {
-        if self.is_at_end() {
-            return false;
+        if let Some(token) = self.peek() {
+            token.token_type == token_type
+        } else {
+            false
         }
-        self.peek().token_type == token_type
     }
 
     fn advance(&mut self) -> &Token {
@@ -322,11 +337,20 @@ impl Parser {
     }
 
     fn is_at_end(&self) -> bool {
-        self.peek().token_type == TokenType::Eof
+        if let Some(token) = self.peek() {
+            token.token_type == TokenType::Eof
+        } else {
+            true
+        }
     }
 
-    fn peek(&self) -> &Token {
-        &self.tokens[self.current]
+    fn peek(&self) -> Option<&Token> {
+        let result = if self.current < self.tokens.len() {
+            Some(&self.tokens[self.current])
+        } else {
+            None
+        };
+        result
     }
 
     fn previous(&self) -> &Token {
@@ -396,17 +420,23 @@ impl Parser {
         let name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?.clone();
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.", kind))?;
     
-        let mut params: Vec<Token> = Vec::new();
+        let mut params: Vec<(Token, Option<Expr>)> = Vec::new();
         if !self.check(TokenType::RightParen) {
             loop {
-                let param_name = self.consume(TokenType::Identifier, "Expect parameter name.")?;
-                params.push(param_name.clone());
-        
+                let param_name = self.consume(TokenType::Identifier, "Expect parameter name.")?.clone();
+                let default_value = if self.match_token(&[TokenType::Equal]) {
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+                params.push((param_name, default_value));
+    
                 if !self.match_token(&[TokenType::Comma]) {
                     break;
                 }
             }
         }
+    
         self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
     
@@ -415,11 +445,9 @@ impl Parser {
             _ => return None,
         };
     
-        let param_tokens: Vec<Token> = params.clone(); 
-    
         Some(Stmt::Function {
             name,
-            params: param_tokens,
+            params: params.into_iter().map(|(token, _)| token).collect(),
             body,
         })
     }

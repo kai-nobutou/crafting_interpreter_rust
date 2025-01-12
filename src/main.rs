@@ -17,6 +17,7 @@ fn main() {
 }
 
 fn run_file(path: &str) {
+    println!("Running file at path: {}", path); 
     let source = fs::read_to_string(path).expect("Failed to read the file");
     run(&source);
 }
@@ -41,18 +42,27 @@ fn run_prompt() {
 }
 
 fn run(source: &str) {
-    let mut scanner = lox::scanner::Scanner::new(source);
-    let tokens_and_defaults = scanner.scan_tokens();
 
-    // トークン部分のみを抽出してParserに渡す
-    let tokens: Vec<lox::token::Token> = tokens_and_defaults
-        .into_iter()
-        .map(|(token, _)| token)
-        .collect();
+    let 
+    mut scanner = lox::scanner::Scanner::new(source);
+    let tokens = scanner.scan_tokens();
+   
+    if tokens.is_empty() {
+        eprintln!("No tokens found, check scanner implementation.");
+        return;
+    }
 
     let mut parser = lox::parser::Parser::new(tokens);
     let statements = parser.parse();
 
+    if statements.is_empty() {
+        eprintln!("Parse error: No valid statements produced.");
+        return;
+    }
+
     let mut evaluator = lox::evaluator::Evaluator::new();
-    evaluator.evaluate_statements(statements);
+    match evaluator.evaluate_statements(statements) {
+        Ok(_) => println!("Evaluation completed successfully."),
+        Err(e) => eprintln!("Evaluation error: {}", e),
+    }
 }

@@ -32,6 +32,7 @@ impl Visitor<String> for AstPrinter {
             LiteralValue::Boolean(b) => b.to_string(),
             LiteralValue::Nil => "nil".to_string(),
             LiteralValue::Function { name, .. } => format!("<fn {}>", name),
+            LiteralValue::Return(inner) => format!("Return({})", inner),
         }
     }
 

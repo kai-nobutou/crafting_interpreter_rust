@@ -62,6 +62,10 @@ pub enum Stmt {
         keyword: Token,
         value: Option<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+    }
 }
 
 impl Expr {
