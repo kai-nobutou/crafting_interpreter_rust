@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, Write};
+use crate::lox::evaluator::EvalResult;
 
 mod lox;
 
@@ -43,8 +44,7 @@ fn run_prompt() {
 
 fn run(source: &str) {
 
-    let 
-    mut scanner = lox::scanner::Scanner::new(source);
+    let mut scanner = lox::scanner::Scanner::new(source);
     let tokens = scanner.scan_tokens();
    
     if tokens.is_empty() {
@@ -62,7 +62,7 @@ fn run(source: &str) {
 
     let mut evaluator = lox::evaluator::Evaluator::new();
     match evaluator.evaluate_statements(statements) {
-        Ok(_) => println!("Evaluation completed successfully."),
-        Err(e) => eprintln!("Evaluation error: {}", e),
+        EvalResult::Return(_) => println!("Evaluation completed successfully."),
+        EvalResult::Error(e) => eprintln!("Evaluation error: {}", e),
     }
 }

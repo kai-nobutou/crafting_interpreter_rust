@@ -64,8 +64,8 @@ pub enum LiteralValue {
         name: String,
         params: Vec<Token>,
         body: Vec<Stmt>,
-        closure: Environment,
     },
+    Return(Box<LiteralValue>),
 }
 
 use std::fmt;
@@ -80,6 +80,7 @@ impl fmt::Display for LiteralValue {
             LiteralValue::Function { name, .. } => {
                 write!(f, "<fn {}>", name)
             }
+            LiteralValue::Return(r) => write!(f, "{}", r),
         }
     }
 }

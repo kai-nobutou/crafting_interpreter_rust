@@ -1,6 +1,7 @@
 use crate::lox::token::Token;
 use crate::lox::token_type::LiteralValue;
 use crate::lox::printer::Visitor;
+use std::collections::HashMap; 
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -30,6 +31,15 @@ pub enum Expr {
         callee: Box<Expr>,
         arguments: Vec<Expr>,
     },
+    Get {
+        object: Box<Expr>,
+        name: Token,
+    },
+    Set {
+        object: Box<Expr>,
+        name: Token,
+        value: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,7 +57,7 @@ pub enum Stmt {
         condition: Option<Expr>,
         increment: Option<Expr>,
         body: Box<Stmt>,
-    }, 
+    },
     If {
         condition: Box<Expr>,
         then_branch: Box<Stmt>,
@@ -62,10 +72,14 @@ pub enum Stmt {
         keyword: Token,
         value: Option<Expr>,
     },
+    Class {
+        name: Token,
+        methods: Vec<(Token, Stmt)>,
+    },
     Call {
         callee: Box<Expr>,
         arguments: Vec<Expr>,
-    }
+    },
 }
 
 impl Expr {
@@ -78,6 +92,44 @@ impl Expr {
             Expr::Unary { operator, operand } => visitor.visit_unary(operator, operand),
             Expr::Assign { name, value } => visitor.visit_assign(name, value),
             Expr::Call { callee, arguments } => visitor.visit_call(callee, arguments),
+            Expr::Get { object, name } => visitor.visit_get(object, name),
+            Expr::Set { object, name, value } => visitor.visit_set(object, name, value),
+        }
+    }
+}
+
+impl Stmt {
+    pub fn accept<R>(&self, visitor: &mut dyn Visitor<R>) -> R {
+        match self {
+            Stmt::Expression(expr) => visitor.visit_expression(expr),
+            Stmt::Print(expr) => visitor.visit_print(expr),
+            Stmt::Var { name, initializer } => visitor.visit_var(name, initializer),
+            Stmt::Block(statements) => visitor.visit_block(statements),
+            Stmt::While(condition, body) => visitor.visit_while(condition, body),
+            Stmt::For {
+                initializer,
+                condition,
+                increment,
+                body,
+            } => visitor.visit_for(initializer, condition, increment, body),
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let temp_else_branch: Option<Stmt> = else_branch
+                    .as_ref()
+                    .map(|stmt| (**stmt).clone());
+                visitor.visit_if(
+                    condition.as_ref(),
+                    then_branch.as_ref(),
+                    &temp_else_branch,
+                )
+            },
+            Stmt::Function { name, params, body } => visitor.visit_function(name, params, body),
+            Stmt::Return { keyword, value } => visitor.visit_return(keyword, value),
+            Stmt::Class { name, methods } => visitor.visit_class(name, methods),
+            Stmt::Call { callee, arguments } => visitor.visit_call(callee, arguments),
         }
     }
 }

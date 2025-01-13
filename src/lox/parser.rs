@@ -305,6 +305,7 @@ impl Parser {
 
     fn match_token(&mut self, types: &[TokenType]) -> bool {
         for &t in types {
+            println!("Matched token: {:?}", t);
             if self.check(t) {
                 self.advance();
                 return true;
