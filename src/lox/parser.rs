@@ -56,20 +56,47 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Option<Stmt> {
-        if self.match_token(&[TokenType::For]) {
-            self.for_statement()
-        } else if self.match_token(&[TokenType::While]) {
-            self.while_statement()
-        } else if self.match_token(&[TokenType::If]) {
-            self.if_statement()
-        } else if self.match_token(&[TokenType::Return]) {
-            self.return_statement()
-        } else if self.match_token(&[TokenType::Print]) {
-            self.print_statement()
-        } else if self.match_token(&[TokenType::LeftBrace]) {
-            self.block()
-        } else {
-            self.expression_statement()
+        match self.peek()?.token_type {
+            TokenType::For => {
+                println!("Matched For");
+                self.advance();
+                self.for_statement()
+            }
+            TokenType::While => {
+                println!("Matched While");
+                self.advance();
+                self.while_statement()
+            }
+            TokenType::If => {
+                println!("Matched If");
+                self.advance();
+                self.if_statement()
+            }
+            TokenType::Return => {
+                println!("Matched Return");
+                self.advance();
+                self.return_statement()
+            }
+            TokenType::Print => {
+                println!("Matched Print");
+                self.advance();
+                self.print_statement()
+            }
+            TokenType::LeftBrace => {
+                println!("Matched Block");
+                self.advance();
+                self.block()
+            }
+            _ => {
+                println!("Matched Expression or Assignment");
+                if let Some(expr) = self.assignment() {
+                    // セミコロンを消費
+                    self.consume(TokenType::Semicolon, "Expected ';' after expression or assignment.")?;
+                    Some(Stmt::Expression(expr))
+                } else {
+                    self.expression_statement()
+                }
+            }
         }
     }
 
@@ -95,25 +122,61 @@ impl Parser {
     }
 
     fn if_statement(&mut self) -> Option<Stmt> {
+        println!("Entering if_statement");
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         
-        let condition = self.expression()?;
-        
+        // 条件式のパース
+        let condition = match self.expression() {
+            Some(cond) => {
+                println!("Parsed condition: {:?}", cond);
+                cond
+            }
+            None => {
+                eprintln!("Failed to parse condition in if_statement");
+                return None;
+            }
+        };
+    
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
-        
-        let then_branch = self.statement()?;
-        
+    
+        // then_branch のパース
+        let then_branch = match self.statement() {
+            Some(stmt) => {
+                println!("Parsed then_branch: {:?}", stmt);
+                stmt
+            }
+            None => {
+                eprintln!("Failed to parse then_branch in if_statement");
+                return None;
+            }
+        };
+    
+        // else_branch のパース
         let else_branch = if self.match_token(&[TokenType::Else]) {
-            Some(self.statement()?)
+            match self.statement() {
+                Some(stmt) => {
+                    println!("Parsed else_branch: {:?}", stmt);
+                    Some(stmt)
+                }
+                None => {
+                    eprintln!("Failed to parse else_branch in if_statement");
+                    return None;
+                }
+            }
         } else {
+            println!("No else_branch found");
             None
         };
-        
-        Some(Stmt::If {
+    
+        // Stmt::If の生成
+        let stmt = Stmt::If {
             condition: Box::new(condition),
             then_branch: Box::new(then_branch),
             else_branch: else_branch.map(Box::new),
-        })
+        };
+        println!("Generated If statement: {:?}", stmt);
+    
+        Some(stmt)
     }
 
     fn block(&mut self) -> Option<Stmt> {
@@ -122,9 +185,10 @@ impl Parser {
     
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
             if let Some(stmt) = self.declaration() {
+                println!("block: Successfully parsed statement: {:?}", stmt);
                 statements.push(stmt);
             } else {
-                println!("block: Error in declaration inside block");
+                println!("block: Error in declaration inside block. Current token: {:?}", self.peek());
                 return None;
             }
         }
@@ -300,12 +364,23 @@ impl Parser {
                 expression: Box::new(expr),
             });
         }
+
+        if self.match_token(&[TokenType::True]) {
+            return Some(Expr::Literal {
+                value: LiteralValue::Boolean(true),
+            });
+        }
+
+        if self.match_token(&[TokenType::False]) {
+            return Some(Expr::Literal {
+                value: LiteralValue::Boolean(false),
+            });
+        }
         None
     }
 
     fn match_token(&mut self, types: &[TokenType]) -> bool {
         for &t in types {
-            println!("Matched token: {:?}", t);
             if self.check(t) {
                 self.advance();
                 return true;
@@ -316,6 +391,7 @@ impl Parser {
 
     fn consume(&mut self, token_type: TokenType, message: &str) -> Option<&Token> {
         if self.check(token_type) {
+            println!("Consumed token: {:?}", self.peek());
             return Some(self.advance());
         }
         eprintln!("Parsing error in consume: {}", message);

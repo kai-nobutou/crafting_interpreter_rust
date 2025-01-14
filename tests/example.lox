@@ -1,20 +1,9 @@
-var x = 10;
-print x;
-
-var x = 10;
-print x;
-
-if (x > 5) {
-    print "x is greater than 5";
-} else {
-    print "x is less than or equal to 5";
+fun factorial(n) {
+    if (n < 0) {
+        throw "Error: Factorial is not defined for negative numbers.";
+    }
+    if (n <= 1) return 1; 
+    return n * factorial(n - 1);
 }
 
-for (var i = 0; i < 3; i = i + 1) {
-    print i;
-}
-
-while (x > 0) {
-    print x;
-    x = x - 1;
-}
+print factorial(5);

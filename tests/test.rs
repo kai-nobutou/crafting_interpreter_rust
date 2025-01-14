@@ -13,6 +13,7 @@ mod tests {
         let tokens = Scanner::new(input).scan_tokens();
         let mut parser = Parser::new(tokens);
         let statements = parser.parse();
+        println!("{:?}", statements);
     
         evaluator.evaluate_statements(statements);
         evaluator.get_output() // 結果を取得

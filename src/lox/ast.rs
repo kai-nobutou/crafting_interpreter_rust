@@ -80,6 +80,10 @@ pub enum Stmt {
         callee: Box<Expr>,
         arguments: Vec<Expr>,
     },
+    Assign {
+        name: Token,
+        value: Expr,
+    },
 }
 
 impl Expr {
@@ -130,6 +134,7 @@ impl Stmt {
             Stmt::Return { keyword, value } => visitor.visit_return(keyword, value),
             Stmt::Class { name, methods } => visitor.visit_class(name, methods),
             Stmt::Call { callee, arguments } => visitor.visit_call(callee, arguments),
+            Stmt::Assign { name, value }  => visitor.visit_assign(name, value)
         }
     }
 }
