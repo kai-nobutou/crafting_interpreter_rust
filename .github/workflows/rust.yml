@@ -14,44 +14,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Rust のインストール
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-
-      # Rust ドキュメントのビルド
+      # Rust のインストールとドキュメントビルド
       - name: Build Rust Docs
         run: cargo doc --no-deps
 
-      # Debug: Check generated docs
-      - name: Debug: Check Generated Docs
-        run: |
-          echo "Checking if target/doc exists..."
-          if [ -d "./target/doc" ]; then
-            echo "Documentation directory found. Listing contents:"
-            ls -la ./target/doc
-          else
-            echo "Error: Documentation directory './target/doc' does not exist."
-            exit 1
-          fi
-
-      # デプロイ用ファイルのコピーと設定
-      - name: Prepare Files for Deployment
-        run: |
-          rm -rf *
-          cp -r ./target/doc/* .
-          touch .nojekyll # GitHub Pages で Jekyll を無効化する設定
-
-      # Git の設定
-      - name: Setup Git Config
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-      # 変更をコミットしてプッシュ
-      - name: Commit and Push Changes
-        run: |
-          git add .
-          git commit -m "Deploy Rust Docs" || echo "No changes to commit"
-          git push origin gh-pages --force
+      # gh-pages ブランチにデプロイ
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
