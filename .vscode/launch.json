@@ -63,6 +63,43 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'generate_ast'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=generate_ast",
+                    "--package=crafting_interpreter"
+                ],
+                "filter": {
+                    "name": "generate_ast",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'generate_ast'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=generate_ast",
+                    "--package=crafting_interpreter"
+                ],
+                "filter": {
+                    "name": "generate_ast",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug integration test 'scanner_test'",
             "cargo": {
                 "args": [

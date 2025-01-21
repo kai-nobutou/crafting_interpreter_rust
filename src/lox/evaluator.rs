@@ -1,8 +1,8 @@
 use crate::lox::ast::{Expr, Stmt};
+use crate::lox::error::LoxError;
 use crate::lox::token::Token;
 use crate::lox::token_type::{LiteralValue, TokenType};
 use std::collections::HashMap;
-use std::process::Output;
 use std::time::SystemTime;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +12,7 @@ pub struct Environment {
 }
 
 impl Environment {
+    /// 新しい環境を作成
     pub fn new() -> Self {
         Environment {
             enclosing: None,
@@ -19,69 +20,48 @@ impl Environment {
         }
     }
 
+    /// 指定された環境を囲む新しい環境を作成
     pub fn with_enclosing(enclosing: Environment) -> Self {
-        println!("Creating new environment with enclosing: {:?}", enclosing.values);
         Environment {
             enclosing: Some(Box::new(enclosing)),
             values: HashMap::new(),
         }
     }
 
+    /// 環境に新しい変数を定義
+    pub fn define(&mut self, name: String, value: Value) {
+        self.values.insert(name, value);
+    }
+
+    /// 子スコープの値を親スコープに統合する（現状では統合せずログ出力のみ）
     pub fn merge_to_parent(&mut self) {
         if let Some(parent) = &mut self.enclosing {
-            println!("Before merging: Child values: {:?}", self.values);
-            println!("Parent values before merge: {:?}", parent.values);
-            
-            for (key, value) in self.values.iter() {
-                println!("Merging key: {}, value: {:?}", key, value);
-                parent.values.insert(key.clone(), value.clone());
-            }
-            
-            println!("Parent values after merge: {:?}", parent.values);
+            // 子スコープの値をマージせずにログ出力
+            for (key, value) in self.values.iter() {}
         }
     }
 
-    pub fn define(&mut self, name: String, value: Value) {
-        println!("Defining variable: {} = {:?} in current scope", name, value);
-        self.values.insert(name, value);
-        println!("Current scope after define: {:?}", self.values);
-    }
-    
+    /// 変数の値を取得（現在のスコープまたは親スコープを検索）
     pub fn get(&self, name: &str) -> Option<Value> {
         if let Some(value) = self.values.get(name) {
-            println!("Variable {} found in current scope: {:?}", name, value);
             Some(value.clone())
         } else if let Some(enclosing) = &self.enclosing {
-            println!("Variable {} not found in current scope, checking enclosing scope.", name);
             enclosing.get(name)
         } else {
-            println!("Variable {} not found in any scope.", name);
             None
         }
     }
 
+    /// 変数の値を更新（存在しない場合はエラーを返す）
     pub fn assign(&mut self, name: String, value: Value) -> Result<(), String> {
-        println!(
-            "Assigning variable: {}. Current scope: {:?}, Enclosing scope: {:?}",
-            name,
-            self.values,
-            self.enclosing.as_ref().map(|env| &env.values)
-        );
-    
-        // 現在のスコープで変数を探し、存在する場合は更新
         if self.values.contains_key(&name) {
             self.values.insert(name, value);
         } else if let Some(enclosing) = &mut self.enclosing {
-            // 親スコープに代入する前に現在のスコープに保存
-            println!("Variable '{}' not found in current scope. Adding to current environment.", name);
             self.values.insert(name.clone(), value.clone());
             enclosing.assign(name, value)?;
         } else {
-            println!("Variable '{}' not defined in any scope.", name);
             return Err(format!("Variable '{}' not defined.", name));
         }
-    
-        println!("Current scope after assign: {:?}", self.values);
         Ok(())
     }
 }
@@ -130,7 +110,7 @@ impl std::fmt::Display for Value {
 #[derive(Debug)]
 pub enum EvalResult {
     Return(Value),
-    Error(String),
+    Error(LoxError),
 }
 
 pub struct Evaluator {
@@ -139,17 +119,29 @@ pub struct Evaluator {
 }
 
 impl Evaluator {
+    /// `Evaluator` の新しいインスタンスを作成します。
+    ///
+    /// この初期化では、新しい環境を設定し、標準のネイティブ関数を登録します。
+    ///
+    /// # ネイティブ関数
+    /// - `clock`: 現在のUNIXエポック時間を秒単位で返します。
+    ///
+    /// # 戻り値
+    /// 新しい `Evaluator` インスタンス。
     pub fn new() -> Self {
         let mut environment = Environment::new();
 
         // ネイティブ関数の登録
-        environment.define("clock".to_string(), Value::NativeFunction(|_args| {
-            let time = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            Value::Number(time as f64)
-        }));
+        environment.define(
+            "clock".to_string(),
+            Value::NativeFunction(|_args| {
+                let time = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                Value::Number(time as f64)
+            }),
+        );
 
         Self {
             environment,
@@ -157,6 +149,14 @@ impl Evaluator {
         }
     }
 
+    /// ステートメントのリストを評価します。
+    ///
+    /// # 引数
+    /// - `statements`: 評価するステートメントのリスト
+    ///
+    /// # 戻り値
+    /// - 成功時: 最後に評価された値を含む `EvalResult::Return`
+    /// - 失敗時: エラー `LoxError` を含む `EvalResult::Error`
     pub fn evaluate_statements(&mut self, statements: Vec<Stmt>) -> EvalResult {
         let mut last_value = Value::Nil; // 最後の評価結果を保持
         for stmt in statements {
@@ -168,135 +168,120 @@ impl Evaluator {
         EvalResult::Return(last_value) // 最後の値を返す
     }
 
-    pub fn get_output(&self) -> String {
-        self.output.join("\n")
-    }
-
+    /// ステートメントを評価します。
+    ///
+    /// # 引数
+    /// - `stmt`: 評価するステートメント。
+    ///
+    /// # 戻り値
+    /// - `EvalResult`: 評価結果（`Return` または `Error`）。
     fn execute(&mut self, stmt: Stmt) -> EvalResult {
         match stmt {
-            Stmt::Expression(expr) => {
-                if let Ok(value) = self.evaluate(&expr) {
+            Stmt::Expression(expr) => match self.evaluate(&expr) {
+                Ok(value) => EvalResult::Return(Value::Nil),
+                Err(err) => {
+                    let context = format!("Error occurred during expression evaluation: {:?}", err);
+                    EvalResult::Error(LoxError::InvalidTypeConversion(context))
                 }
-                EvalResult::Return(Value::Nil)
-            }
-            Stmt::Print(expr) => {
-                match self.evaluate(&expr) {
-                    Ok(value) => {
-                        self.output.push(value.to_string());
-                        println!("Print statement executed with value: {}", value);
-                        EvalResult::Return(Value::Nil)
-                    }
-                    Err(err) => EvalResult::Error(err),
+            },
+            Stmt::Print(expr) => match self.evaluate(&expr) {
+                Ok(value) => {
+                    self.output.push(value.to_string());
+                    EvalResult::Return(Value::Nil)
                 }
-            }
+                Err(err) => {
+                    self.output.push(format!("[Error: {}]", err));
+                    EvalResult::Error(err)
+                }
+            },
             Stmt::Var { name, initializer } => {
                 let value = if let Some(init) = initializer {
                     match self.evaluate(&init) {
                         Ok(val) => val,
-                        Err(err) => return EvalResult::Error(err),
+                        Err(err) => {
+                            return EvalResult::Error(err);
+                        }
                     }
                 } else {
                     Value::Nil
                 };
+
                 self.environment.define(name.lexeme.clone(), value);
                 EvalResult::Return(Value::Nil)
             }
             Stmt::Block(statements) => {
-                println!("Creating a new block. Current environment: {:?}", self.environment.values);
                 let enclosing = self.environment.clone();
                 let new_env = Environment::with_enclosing(enclosing);
-            
                 let mut previous_env = std::mem::replace(&mut self.environment, new_env);
-            
+
                 let mut last_result = EvalResult::Return(Value::Nil);
-            
+
                 for stmt in statements {
                     let result = self.execute(stmt);
-            
-                    if let EvalResult::Error(_) = result {
-                        self.environment = previous_env;
-                        return result;
-                    }
-            
-                    if let EvalResult::Return(_) = result {
-                        last_result = result;
+
+                    match result {
+                        EvalResult::Error(err) => {
+                            self.environment = previous_env;
+                            return EvalResult::Error(err);
+                        }
+                        EvalResult::Return(_) => last_result = result,
                     }
                 }
-            
-                // 子環境を親環境にマージ
-                // 子環境を親環境にマージ
-                println!(
-                    "Before merging: Child environment: {:?}, Enclosing environment: {:?}",
-                    self.environment.values,
-                    self.environment.enclosing.as_ref().map(|env| &env.values),
-                );
+
                 self.environment.merge_to_parent();
 
-                // 元の環境に戻す際に、マージされた状態を反映させる
                 if let Some(enclosing) = &self.environment.enclosing {
                     previous_env.values.extend(enclosing.values.clone());
                 }
 
                 self.environment = previous_env;
-                println!("Restored previous environment: {:?}", self.environment.values);
-                
+
                 last_result
             }
             Stmt::While(condition, body) => {
-                println!("Entering while loop with condition: {:?}", condition);
                 loop {
                     match self.evaluate(&condition) {
-                        Ok(Value::Boolean(true)) => {
-                            println!("Condition evaluated to true, entering loop body.");
-                            
-                            match self.execute(*body.clone()) {
-                                EvalResult::Error(err) => {
-                                    println!("Exiting loop due to error: {}", err);
-                                    return EvalResult::Error(err);
-                                }
-                                EvalResult::Return(_) => {
-                                    println!("Loop body executed with a return statement. Continuing loop.");
-                                    // `Return` を受け取ってもループは継続
-                                    continue;
-                                }
-                                _ => {
-                                    println!("Body executed successfully, continuing loop.");
-                                }
+                        Ok(Value::Boolean(true)) => match self.execute(*body.clone()) {
+                            EvalResult::Error(err) => {
+                                return EvalResult::Error(err);
                             }
-                        }
+                            EvalResult::Return(_) => continue,
+                            _ => println!("Body executed successfully, continuing loop."),
+                        },
                         Ok(Value::Boolean(false)) => {
-                            println!("Condition evaluated to false, exiting loop.");
                             break;
                         }
                         Err(err) => {
-                            println!("Error evaluating while condition: {}", err);
                             return EvalResult::Error(err);
                         }
                         _ => {
-                            return EvalResult::Error("Condition must evaluate to a boolean.".to_string());
+                            return EvalResult::Error(LoxError::NonBooleanCondition(
+                                "Condition must evaluate to a boolean.".to_string(),
+                            ));
                         }
                     }
                 }
                 EvalResult::Return(Value::Nil)
             }
-
             Stmt::If {
                 condition,
                 then_branch,
                 else_branch,
-            } => {
-                match self.evaluate(&condition) {
-                    Ok(Value::Boolean(true)) => self.execute(*then_branch),
-                    Ok(Value::Boolean(false)) => {
-                        if let Some(else_branch) = else_branch {
-                            self.execute(*else_branch)
-                        } else {
-                            EvalResult::Return(Value::Nil)
-                        }
-                    }
-                    _ => EvalResult::Error("Condition must evaluate to a boolean.".to_string()),
-                }
-            }
+            } => match self.evaluate(&condition) {
+                Ok(Value::Boolean(true)) => self.execute(*then_branch),
+
+                Ok(Value::Boolean(false)) => else_branch
+                    .map_or(EvalResult::Return(Value::Nil), |branch| {
+                        self.execute(*branch)
+                    }),
+
+                Err(err) => EvalResult::Error(err),
+                Err(err) => EvalResult::Error(err),
+
+                _ => EvalResult::Error(LoxError::NonBooleanCondition(
+                    "Condition must evaluate to a boolean.".to_string(),
+                )),
+            },
             Stmt::For {
                 initializer,
                 condition,
@@ -304,29 +289,28 @@ impl Evaluator {
                 body,
             } => {
                 if let Some(initializer) = initializer {
-                    match self.execute(*initializer) {
-                        EvalResult::Error(err) => return EvalResult::Error(err),
-                        _ => {}
+                    if let EvalResult::Error(err) = self.execute(*initializer) {
+                        return EvalResult::Error(err);
                     }
                 }
-    
+
                 let condition_expr = condition.unwrap_or_else(|| Expr::Literal {
                     value: LiteralValue::Boolean(true),
                 });
-    
+
                 while let Ok(Value::Boolean(true)) = self.evaluate(&condition_expr) {
                     match self.execute(*body.clone()) {
                         EvalResult::Error(err) => return EvalResult::Error(err),
                         _ => {}
                     }
-                
+
                     if let Some(increment) = &increment {
-                        match self.evaluate(increment) {
-                            Ok(_) => {}
-                            Err(err) => return EvalResult::Error(err),
+                        if let Err(err) = self.evaluate(increment) {
+                            return EvalResult::Error(err);
                         }
                     }
                 }
+
                 EvalResult::Return(Value::Nil)
             }
             Stmt::Call { callee, arguments } => {
@@ -334,18 +318,18 @@ impl Evaluator {
                     Ok(value) => value,
                     Err(err) => return EvalResult::Error(err),
                 };
-            
-                let argument_values: Result<Vec<_>, _> = arguments.iter().map(|arg| self.evaluate(arg)).collect();
-                let argument_values = match argument_values {
-                    Ok(values) => values,
-                    Err(err) => return EvalResult::Error(err),
-                };
-            
-                match self.evaluate_call(function, argument_values) {
-                    Ok(value) => EvalResult::Return(value),
+
+                let argument_values: Result<Vec<_>, _> =
+                    arguments.iter().map(|arg| self.evaluate(arg)).collect();
+
+                match argument_values {
+                    Ok(values) => match self.evaluate_call(function, values) {
+                        Ok(value) => EvalResult::Return(value),
+                        Err(err) => EvalResult::Error(err),
+                    },
                     Err(err) => EvalResult::Error(err),
                 }
-            },
+            }
             Stmt::Function { name, params, body } => {
                 let function = Value::Function {
                     name: name.lexeme.clone(),
@@ -355,87 +339,59 @@ impl Evaluator {
                 self.environment.define(name.lexeme.clone(), function);
                 EvalResult::Return(Value::Nil)
             }
-            Stmt::Return { keyword, value } => {
-                // Return の値を評価
-                let return_value = if let Some(expr) = value {
-                    match self.evaluate(&expr) {
-                        Ok(val) => {
-                            println!("Evaluating return value: {:?}", val);
-                            val
-                        }
+            Stmt::Return { value, .. } => {
+                let return_value = match value {
+                    Some(expr) => match self.evaluate(&expr) {
+                        Ok(val) => val,
                         Err(err) => return EvalResult::Error(err),
-                    }
-                } else {
-                    println!("Returning Nil");
-                    Value::Nil
+                    },
+                    None => Value::Nil,
                 };
-            
-                println!("Return statement executed with value: {:?}", return_value);
-            
-                // Return を特別な値として扱い、後続の処理をスキップ
                 EvalResult::Return(Value::Return(Box::new(return_value)))
             }
-            Stmt::Assign { name, value } => {
-                println!("Executing assignment statement for: {}", name.lexeme);
-            
-                // 値を評価
-                let val = match self.evaluate(&value) {
-                    Ok(v) => v,
-                    Err(err) => return EvalResult::Error(err),
-                };
-            
-                // 現在の環境で代入を実行
-                match self.environment.assign(name.lexeme.clone(), val.clone()) {
-                    Ok(_) => {
-                        println!("Successfully assigned value: {:?} to variable: {}", val, name.lexeme);
-                        EvalResult::Return(Value::Nil)
+            Stmt::Assign { name, value } => match self.evaluate(&value) {
+                Ok(val) => {
+                    if let Err(_) = self.environment.assign(name.lexeme.clone(), val.clone()) {
+                        return EvalResult::Error(LoxError::UndefinedVariable(name.lexeme.clone()));
                     }
-                    Err(err) => {
-                        println!("Assignment failed: {}", err);
-                        EvalResult::Error(err)
-                    }
+                    EvalResult::Return(Value::Nil)
                 }
-            }
-            _ => EvalResult::Error("Unsupported statement.".to_string()),
+                Err(err) => EvalResult::Error(err),
+            },
+            _ => EvalResult::Error(LoxError::InvalidTypeConversion(
+                "Unsupported statement.".to_string(),
+            )),
         }
     }
 
-    fn execute_block(&mut self, statements: Vec<Stmt>, mut new_env: Environment) -> Result<Value, String> {
-        let previous_env = std::mem::replace(&mut self.environment, new_env);
-
-        let mut result = Ok(Value::Nil);
-            for stmt in statements {
-                match self.execute(stmt) {
-                    EvalResult::Return(value) => {
-                        result = Ok(value);
-                        break;
-                    }
-                    EvalResult::Error(err) => {
-                        result = Err(err);
-                        break;
-                    }
-                    _  => {}
-                }
-            }
-
-            self.environment = previous_env;
-            result
-        }
-
-    fn evaluate(&mut self, expr: &Expr) -> Result<Value, String> {
+    /// 式を評価します。
+    ///
+    /// # 引数
+    /// - `expr`: 評価対象の式。
+    ///
+    /// # 戻り値
+    /// - 成功時: 評価結果 `Value` を含む `Ok`。
+    /// - 失敗時: エラー `LoxError` を含む `Err`。
+    fn evaluate(&mut self, expr: &Expr) -> Result<Value, LoxError> {
         match expr {
-            Expr::Literal { value } => Ok(self.literal_to_value(value.clone())),
+            Expr::Literal { value } => self.literal_to_value(value.clone()),
+
             Expr::Unary { operator, operand } => {
                 let right = self.evaluate(operand)?;
                 match operator.token_type {
                     TokenType::Minus => match right {
                         Value::Number(n) => Ok(Value::Number(-n)),
-                        _ => Err("Operand must be a number.".to_string()),
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operand must be a number for unary minus.".to_string(),
+                        )),
                     },
                     TokenType::Bang => Ok(Value::Boolean(!self.is_truthy(right))),
-                    _ => Err("Invalid unary operator.".to_string()),
+                    _ => Err(LoxError::InvalidTypeConversion(
+                        "Invalid unary operator.".to_string(),
+                    )),
                 }
             }
+
             Expr::Binary {
                 left,
                 operator,
@@ -443,101 +399,160 @@ impl Evaluator {
             } => {
                 let left_value = self.evaluate(left)?;
                 let right_value = self.evaluate(right)?;
-                println!(
-                    "Binary operation: {:?} {:?} {:?}",
-                    left_value, operator.token_type, right_value
-                );
                 match operator.token_type {
                     TokenType::Plus => match (left_value, right_value) {
-                        (Value::Number(l), Value::Number(r)) => {
-                            println!("Adding: {} + {}", l, r);
-                            Ok(Value::Number(l + r))
-                        }
-                        (Value::String(l), Value::String(r)) => {
-                            println!("Concatenating: {} + {}", l, r);
-                            Ok(Value::String(l + &r))
-                        }
-                        _ => Err("Operands must be two numbers or two strings.".to_string()),
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
+                        (Value::String(l), Value::String(r)) => Ok(Value::String(l + &r)),
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operands must be two numbers or two strings for '+'.".to_string(),
+                        )),
                     },
                     TokenType::Minus => match (left_value, right_value) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-                        _ => Err("Operands must be numbers.".to_string()),
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operands must be numbers for '-'.".to_string(),
+                        )),
                     },
                     TokenType::Star => match (left_value, right_value) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-                        _ => Err("Operands must be numbers.".to_string()),
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operands must be numbers for '*'.".to_string(),
+                        )),
                     },
                     TokenType::Slash => match (left_value, right_value) {
                         (Value::Number(l), Value::Number(r)) => {
                             if r == 0.0 {
-                                Err("Division by zero.".to_string())
+                                Err(LoxError::DivisionByZero)
                             } else {
                                 Ok(Value::Number(l / r))
                             }
                         }
-                        _ => Err("Operands must be numbers.".to_string()),
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operands must be numbers for '/'.".to_string(),
+                        )),
                     },
-                    TokenType::Less => match (left_value, right_value) {
-                        (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l < r)),
-                        _ => Err("Operands must be numbers.".to_string()),
+                    TokenType::Less
+                    | TokenType::LessEqual
+                    | TokenType::Greater
+                    | TokenType::GreaterEqual => match (left_value, right_value) {
+                        (Value::Number(l), Value::Number(r)) => match operator.token_type {
+                            TokenType::Less => Ok(Value::Boolean(l < r)),
+                            TokenType::LessEqual => Ok(Value::Boolean(l <= r)),
+                            TokenType::Greater => Ok(Value::Boolean(l > r)),
+                            TokenType::GreaterEqual => Ok(Value::Boolean(l >= r)),
+                            _ => unreachable!(),
+                        },
+                        _ => Err(LoxError::InvalidTypeConversion(
+                            "Operands must be numbers for comparison.".to_string(),
+                        )),
                     },
-                    TokenType::LessEqual => match (left_value, right_value) {
-                        (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l <= r)),
-                        _ => Err("Operands must be numbers.".to_string()),
-                    },
-                    TokenType::Greater => match (left_value, right_value) {
-                        (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l > r)),
-                        _ => Err("Operands must be numbers.".to_string()),
-                    },
-                    TokenType::GreaterEqual => match (left_value, right_value) {
-                        (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
-                        _ => Err("Operands must be numbers.".to_string()),
-                    },
-                    _ => Err("Invalid binary operator.".to_string()),
+                    _ => Err(LoxError::InvalidTypeConversion(
+                        "Invalid binary operator.".to_string(),
+                    )),
                 }
             }
-            Expr::Variable { name } => {
-                println!("Evaluating variable: {}", name.lexeme);
-                self.environment
-                    .get(&name.lexeme)
-                    .ok_or_else(|| format!("Undefined variable '{}'.", name.lexeme))
-            }
-            Expr::Grouping { expression } => {
-                self.evaluate(expression)
-            },
+
+            Expr::Variable { name } => self
+                .environment
+                .get(&name.lexeme)
+                .ok_or_else(|| LoxError::UndefinedVariable(name.lexeme.clone())),
+
+            Expr::Grouping { expression } => self.evaluate(expression),
+
             Expr::Assign { name, value } => {
                 let val = self.evaluate(value)?;
-                println!("Assigning value: {:?} to variable: {}", val, name.lexeme);
-                match self.environment.assign(name.lexeme.clone(), val.clone()) {
-                    Ok(_) => println!("Environment updated successfully for {}", name.lexeme),
-                    Err(err) => println!("Failed to update environment for {}: {}", name.lexeme, err),
-                }
+                self.environment
+                    .assign(name.lexeme.clone(), val.clone())
+                    .map_err(|_| LoxError::UndefinedVariable(name.lexeme.clone()))?;
                 Ok(val)
             }
+
             Expr::Call { callee, arguments } => {
-                let function = self.evaluate(&callee)?;
-
-                // 引数を評価
-                let argument_values: Result<Vec<_>, _> = arguments.iter().map(|arg| self.evaluate(arg)).collect();
-                let argument_values = argument_values?;
-
-                // 関数呼び出しを処理
-                self.evaluate_call(function, argument_values)
+                let function = self.evaluate(callee)?;
+                let argument_values: Result<Vec<_>, _> =
+                    arguments.iter().map(|arg| self.evaluate(arg)).collect();
+                self.evaluate_call(function, argument_values?)
             }
-            _ => Err("Unsupported expression.".to_string()),
+
+            _ => Err(LoxError::InvalidTypeConversion(
+                "Unsupported expression.".to_string(),
+            )),
         }
     }
 
-    fn literal_to_value(&self, literal: LiteralValue) -> Value {
+    /// ブロックを実行します。
+    ///
+    /// # 引数
+    /// - `statements`: 実行するステートメントのリスト。
+    /// - `new_env`: ブロック専用の新しい環境。
+    ///
+    /// # 戻り値
+    /// - 成功時: 最後に評価された値を含む `Ok`。
+    /// - 失敗時: エラー `LoxError` を含む `Err`。
+    fn execute_block(
+        &mut self,
+        statements: Vec<Stmt>,
+        new_env: Environment,
+    ) -> Result<Value, LoxError> {
+        let previous_env = std::mem::replace(&mut self.environment, new_env);
+        let mut last_result = Value::Nil;
+
+        for stmt in statements {
+            match self.execute(stmt) {
+                EvalResult::Return(Value::Return(inner_value)) => {
+                    self.environment = previous_env;
+                    return Ok(*inner_value);
+                }
+                EvalResult::Return(value) => {
+                    last_result = value;
+                }
+                EvalResult::Error(err) => {
+                    self.environment = previous_env;
+                    return Err(err);
+                }
+                _ => {}
+            }
+        }
+        // ブロック終了後、元の環境を復元
+        self.environment = previous_env;
+
+        Ok(last_result)
+    }
+
+    /// `LiteralValue` を `Value` に変換します。
+    ///
+    /// # 引数
+    /// - `literal`: 変換対象のリテラル値。
+    ///
+    /// # 戻り値
+    /// - 成功時: 対応する `Value` を含む `Ok`。
+    /// - 失敗時: 未知のリテラル型に対するエラー `LoxError` を含む `Err`。
+    fn literal_to_value(&self, literal: LiteralValue) -> Result<Value, LoxError> {
         match literal {
-            LiteralValue::Boolean(b) => Value::Boolean(b),
-            LiteralValue::Number(n) => Value::Number(n),
-            LiteralValue::String(s) => Value::String(s),
-            LiteralValue::Nil => Value::Nil,
-            _ => Value::Nil, // 他のリテラルタイプを追加
+            LiteralValue::Boolean(b) => Ok(Value::Boolean(b)),
+            LiteralValue::Number(n) => Ok(Value::Number(n)),
+            LiteralValue::String(s) => Ok(Value::String(s)),
+            LiteralValue::Nil => Ok(Value::Nil),
+            _ => {
+                // 未対応の型の場合、エラーを返す
+                let err_message = format!("Unsupported literal value: {:?}", literal);
+                Err(LoxError::InvalidTypeConversion(err_message))
+            }
         }
     }
 
+    /// 値が「真」とみなされるかを判定します。
+    ///
+    /// # 引数
+    /// - `value`: 判定対象の値。
+    ///
+    /// # 戻り値
+    /// - `true`: 値が「真」とみなされる場合。
+    /// - `false`: 値が「偽」とみなされる場合。
+    ///
+    /// # 備考
+    /// - `Nil` および `Boolean(false)` は偽とみなされます。
+    /// - その他の値はすべて真とみなされます。
     fn is_truthy(&self, value: Value) -> bool {
         match value {
             Value::Boolean(b) => b,
@@ -546,46 +561,49 @@ impl Evaluator {
         }
     }
 
-    fn evaluate_call(
-        &mut self,
-        function: Value,
-        arguments: Vec<Value>,
-    ) -> Result<Value, String> {
-        println!("Evaluating call to function: {:?} with arguments: {:?}", function, arguments);
-        
+    /// 関数呼び出しを評価します。
+    ///
+    /// # 引数
+    /// - `function`: 呼び出される関数の値。
+    /// - `arguments`: 関数に渡される引数。
+    ///
+    /// # 戻り値
+    /// - 成功時: 評価結果 `Value` を含む `Ok`。
+    /// - 失敗時: エラー `LoxError` を含む `Err`。
+    fn evaluate_call(&mut self, function: Value, arguments: Vec<Value>) -> Result<Value, LoxError> {
+        // 関数として扱えるかを確認
         if let Value::Function { params, body, .. } = function {
-            // 引数の数が一致するかを確認
+            // 引数の数を検証
             if params.len() != arguments.len() {
-                return Err(format!(
+                return Err(LoxError::InvalidTypeConversion(format!(
                     "Expected {} arguments but got {}.",
                     params.len(),
                     arguments.len()
-                ));
+                )));
             }
-    
-            // 新しい環境を作成
+            // 新しい環境を作成し、引数をバインド
             let mut new_env = Environment::with_enclosing(self.environment.clone());
-    
-            // 引数を環境に追加
             for (param, arg) in params.iter().zip(arguments.iter()) {
-                println!("Defining argument: {} = {:?}", param.lexeme, arg);
                 new_env.define(param.lexeme.clone(), arg.clone());
             }
-    
-            // 関数本体を評価
+            // 関数のブロックを実行
             match self.execute_block(body, new_env) {
-                Ok(Value::Return(value)) => {
-                    println!("Returning value from function: {:?}", value);
-                    Ok(*value)
-                }
-                Ok(value) => {
-                    println!("Function executed with value: {:?}", value);
-                    Ok(value)
-                }
-                Err(err) => Err(err),
+                Ok(Value::Return(value)) => Ok(*value),
+                Ok(value) => Ok(value),
+                Err(err) => Err(err), // ここで既に LoxError を返しているのでそのまま渡す
             }
         } else {
-            Err("Can only call functions.".to_string())
+            Err(LoxError::InvalidTypeConversion(
+                "Can only call functions.".to_string(),
+            ))
         }
+    }
+
+    /// 実行結果を取得します。
+    ///
+    /// # 戻り値
+    /// 出力された文字列を結合した結果を返します。
+    pub fn get_output(&self) -> String {
+        self.output.join("\n")
     }
 }

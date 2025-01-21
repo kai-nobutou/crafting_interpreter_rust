@@ -1,7 +1,6 @@
+use crate::lox::printer::Visitor;
 use crate::lox::token::Token;
 use crate::lox::token_type::LiteralValue;
-use crate::lox::printer::Visitor;
-use std::collections::HashMap; 
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -89,7 +88,11 @@ pub enum Stmt {
 impl Expr {
     pub fn accept<R>(&self, visitor: &mut dyn Visitor<R>) -> R {
         match self {
-            Expr::Binary { left, operator, right } => visitor.visit_binary(left, operator, right),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => visitor.visit_binary(left, operator, right),
             Expr::Literal { value } => visitor.visit_literal(value),
             Expr::Grouping { expression } => visitor.visit_grouping(expression),
             Expr::Variable { name } => visitor.visit_variable(name),
@@ -97,7 +100,11 @@ impl Expr {
             Expr::Assign { name, value } => visitor.visit_assign(name, value),
             Expr::Call { callee, arguments } => visitor.visit_call(callee, arguments),
             Expr::Get { object, name } => visitor.visit_get(object, name),
-            Expr::Set { object, name, value } => visitor.visit_set(object, name, value),
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => visitor.visit_set(object, name, value),
         }
     }
 }
@@ -121,20 +128,15 @@ impl Stmt {
                 then_branch,
                 else_branch,
             } => {
-                let temp_else_branch: Option<Stmt> = else_branch
-                    .as_ref()
-                    .map(|stmt| (**stmt).clone());
-                visitor.visit_if(
-                    condition.as_ref(),
-                    then_branch.as_ref(),
-                    &temp_else_branch,
-                )
-            },
+                let temp_else_branch: Option<Stmt> =
+                    else_branch.as_ref().map(|stmt| (**stmt).clone());
+                visitor.visit_if(condition.as_ref(), then_branch.as_ref(), &temp_else_branch)
+            }
             Stmt::Function { name, params, body } => visitor.visit_function(name, params, body),
             Stmt::Return { keyword, value } => visitor.visit_return(keyword, value),
             Stmt::Class { name, methods } => visitor.visit_class(name, methods),
             Stmt::Call { callee, arguments } => visitor.visit_call(callee, arguments),
-            Stmt::Assign { name, value }  => visitor.visit_assign(name, value)
+            Stmt::Assign { name, value } => visitor.visit_assign(name, value),
         }
     }
 }
