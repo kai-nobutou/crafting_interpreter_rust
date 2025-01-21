@@ -24,29 +24,23 @@ jobs:
       - name: Build Rust Docs
         run: cargo doc --no-deps
 
+      # デプロイ用ファイルのコピーと設定
+      - name: Prepare Files for Deployment
+        run: |
+          rm -rf *
+          if [ -d "./target/doc" ]; then
+            cp -r ./target/doc/* .
+          else
+            echo "Error: Documentation directory './target/doc' does not exist."
+            exit 1
+          fi
+          touch .nojekyll # GitHub Pages で Jekyll を無効化する設定
+
       # Git の設定
       - name: Setup Git Config
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-
-      # gh-pages ブランチの作成または切り替え
-      - name: Create or Switch to gh-pages
-        run: |
-          git fetch origin gh-pages || true
-          if git rev-parse --verify origin/gh-pages > /dev/null 2>&1; then
-            git checkout gh-pages
-          else
-            git checkout --orphan gh-pages
-            git reset --hard
-          fi
-
-      # デプロイ用ファイルのコピーと設定
-      - name: Prepare Files for Deployment
-        run: |
-          rm -rf *
-          cp -r target/doc/* .
-          touch .nojekyll # GitHub Pages で Jekyll を無効化する設定
 
       # 変更をコミットしてプッシュ
       - name: Commit and Push Changes
