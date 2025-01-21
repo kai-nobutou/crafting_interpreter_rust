@@ -30,8 +30,8 @@ impl Token {
     ///
     /// # 使用例
     /// ```
-    /// use crate::lox::token_type::{TokenType, LiteralValue};
-    /// use crate::lox::token::Token;
+    /// use crafting_interpreter::lox::token_type::{TokenType, LiteralValue};
+    /// use crafting_interpreter::lox::token::Token;
     ///
     /// let token = Token::new(
     ///     TokenType::Identifier,
