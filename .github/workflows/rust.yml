@@ -1,35 +1,42 @@
-name: Rust
+name: Deploy Rust Docs
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches:
+      - main 
 
 jobs:
-  test:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Run tests
-      run: cargo test --verbose
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-  doc:
-    runs-on: ubuntu-latest
-    needs: test
-    if:  github.event_name == 'push' || github.event.pull_request.merged == true
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
 
-    steps:
-    - uses: actions/checkout@v2
-    - name: Run doc
-      run: cargo doc --no-deps
+      - name: Build Rust Docs
+        run: cargo doc --no-deps
 
-    - name: Deploy
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./target/doc/
+      - name: Setup Git Config
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Create or Switch to gh-pages
+        run: |
+          git fetch origin gh-pages || true
+          git branch gh-pages origin/gh-pages || git branch gh-pages
+          git checkout gh-pages
+          rm -rf *
+          cp -r target/doc/* .
+          touch .nojekyll # 必要に応じてGitHub Pagesの設定ファイル
+
+      - name: Commit and Push Changes
+        run: |
+          git add .
+          git commit -m "Deploy Rust Docs" || echo "No changes to commit"
+          git push origin gh-pages --force
