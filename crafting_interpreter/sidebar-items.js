@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["lox"]};
+window.SIDEBAR_ITEMS = {"mod":["lox","vm"]};

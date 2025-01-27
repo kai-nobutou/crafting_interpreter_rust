@@ -1,5 +1,5 @@
 (function() {
-    var implementors = Object.fromEntries([["crafting_interpreter",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.83.0/core/error/trait.Error.html\" title=\"trait core::error::Error\">Error</a> for <a class=\"enum\" href=\"crafting_interpreter/lox/error/enum.LoxError.html\" title=\"enum crafting_interpreter::lox::error::LoxError\">LoxError</a>"]]]]);
+    var implementors = Object.fromEntries([["crafting_interpreter",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.84.0/core/error/trait.Error.html\" title=\"trait core::error::Error\">Error</a> for <a class=\"enum\" href=\"crafting_interpreter/lox/error/enum.LoxError.html\" title=\"enum crafting_interpreter::lox::error::LoxError\">LoxError</a>"]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {

@@ -1,3 +1,3 @@
-var srcIndex = new Map(JSON.parse('[["crafting_interpreter",["",[["lox",[],["ast.rs","error.rs","evaluator.rs","parser.rs","printer.rs","scanner.rs","token.rs","token_type.rs"]]],["lib.rs"]]]]'));
+var srcIndex = new Map(JSON.parse('[["crafting_interpreter",["",[["lox",[],["ast.rs","error.rs","evaluator.rs","mod.rs","parser.rs","printer.rs","scanner.rs","token.rs","token_type.rs"]],["vm",[],["ast_node.rs","chunk.rs","compiler.rs","mod.rs","parser.rs","traits.rs","vm.rs"]]],["lib.rs"]]],["vm_interpreter",["",[],["vm_main.rs"]]]]'));
 createSrcSidebar();
-//{"start":36,"fragment_lengths":[155]}
+//{"start":36,"fragment_lengths":[256,42]}
