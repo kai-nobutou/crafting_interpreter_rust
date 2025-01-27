@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "crafting_interpreter"  # 追加
+name = "crafting_interpreter"  # デフォルトのインタプリタ用エントリーポイント
 path = "src/main.rs"           # エントリーポイントとなるファイルを指定
+
+[[bin]]
+name = "vm_interpreter"        # バイトコード仮想マシン用エントリーポイント
+path = "src/vm_main.rs"        # バイトコードインタプリタ用のエントリーポイントファイル
 
 [lib]
 name = "crafting_interpreter"

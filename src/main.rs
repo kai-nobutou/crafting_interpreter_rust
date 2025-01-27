@@ -173,56 +173,57 @@ fn run(source: &str) -> Result<String, LoxError> {
     }
 }
 
+
 fn a() {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
 
-    // 青いタイトル行
+    // 青い"N"と"O"の部分
     stdout
         .set_color(ColorSpec::new().set_fg(Some(Color::Blue)))
         .unwrap();
     writeln!(
         &mut stdout,
-        "  ██████╗  ██████╗ ██╗  ██╗    ██████╗  ██████╗ ██╗   ██╗"
+        "  ███╗   ██╗ ██████╗ ██████╗ ██╗   ██╗████████╗ █████╗ ██╗"
     )
     .unwrap();
     writeln!(
         &mut stdout,
-        "  ██╔══██╗██╔═══██╗██║ ██╔╝    ██╔══██╗██╔═══██╗██║   ██║"
+        "  ████╗  ██║██╔═══██╗██╔══██╗██║   ██║╚══██╔══╝██╔══██╗██║"
     )
     .unwrap();
 
-    // 緑の中央行
+    // 緑の"B"と"U"の部分
     stdout
         .set_color(ColorSpec::new().set_fg(Some(Color::Green)))
         .unwrap();
     writeln!(
         &mut stdout,
-        "  ██████╔╝██║   ██║█████╔╝     ██████╔╝██║   ██║██║   ██║"
+        "  ██╔██╗ ██║██║   ██║██████╔╝██║   ██║   ██║   ███████║██║"
     )
     .unwrap();
     writeln!(
         &mut stdout,
-        "  ██╔═══╝ ██║   ██║██╔═██╗     ██╔═══╝ ██║   ██║██║   ██║"
+        "  ██║╚██╗██║██║   ██║██╔═══╝ ██║   ██║   ██║   ██╔══██║██║"
     )
     .unwrap();
 
-    // 赤い最終行
+    // 赤い"TOKAI"の部分
     stdout
         .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
         .unwrap();
     writeln!(
         &mut stdout,
-        "  ██║     ╚██████╔╝██║  ██╗    ██║     ╚██████╔╝╚██████╔╝"
+        "  ██║ ╚████║╚██████╔╝██║     ╚██████╔╝   ██║   ██║  ██║██║"
     )
     .unwrap();
     writeln!(
         &mut stdout,
-        "  ╚═╝      ╚═════╝ ╚═╝  ╚═╝    ╚═╝      ╚═════╝  ╚═════╝ "
+        "  ╚═╝  ╚═══╝ ╚═════╝ ╚═╝      ╚═════╝    ╚═╝   ╚═╝  ╚═╝╚═╝"
     )
     .unwrap();
 
     // リセットしてウェルカムメッセージ
     stdout.reset().unwrap();
-    writeln!(&mut stdout, "Welcome to the LOX Interpreter!").unwrap();
+    writeln!(&mut stdout, "Welcome to the NOBUTOKAI Interpreter!").unwrap();
     writeln!(&mut stdout, "Type your commands below to start...").unwrap();
 }
